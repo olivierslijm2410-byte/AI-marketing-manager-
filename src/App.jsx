@@ -1,8 +1,10 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
+import OnboardingGuard from './components/OnboardingGuard'
 import DashboardLayout from './components/DashboardLayout'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import Onboarding from './pages/Onboarding'
 import Overzicht from './pages/dashboard/Overzicht'
 import Kanalen from './pages/dashboard/Kanalen'
 import Strategie from './pages/dashboard/Strategie'
@@ -16,10 +18,22 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route
+        path="/onboarding"
+        element={
+          <ProtectedRoute>
+            <OnboardingGuard>
+              <Onboarding />
+            </OnboardingGuard>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <DashboardLayout />
+            <OnboardingGuard>
+              <DashboardLayout />
+            </OnboardingGuard>
           </ProtectedRoute>
         }
       >

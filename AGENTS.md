@@ -2,6 +2,11 @@
 
 Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
 
+## Infrastructuur (geen agent, wel vereist voor de agents hieronder)
+- Instagram OAuth-koppeling 🟢 — authorize-flow, callback edge function
+  (token-uitwisseling), opslag in channels-tabel. Werkt end-to-end.
+- Anthropic API-billing 🔴 — sleutel staat klaar, billing nog niet geactiveerd
+
 ## Fase 2-3 (MVP — bouwen we eerst)
 
 ### 1. Website Analysis Agent 🔴
@@ -37,12 +42,22 @@ Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
 ### 9. Market/Competitor Research Agent 🔴 — concurrentie in kaart brengen
 ### 10. Video Generation Agent 🔴 — video's maken (pas bij voldoende klanten, hoge AI-kosten)
 
+## Nieuw toegevoegd (later — focus blijft eerst op social media, zie agent-blauwdrukken)
+
+### 11. SEO Agent 🔴 — vindbaarheid-analyse en concrete verbeterpunten
+### 12. Email Marketing Agent 🔴 — nieuwsbrieven/aanbiedingen (vereist nieuwe e-mail-integratie)
+### 13. Engagement/Reply Agent 🔴 — reacties op comments/DM's voorstellen (na Social Media Agent + Meta-rechten)
+### 14. Sales Sync Agent 🔴 — verkoopdata koppelen aan contentresultaten (na Shopify/WooCommerce)
+
 ## Bouwvolgorde
-Zie technische blauwdruk hoofdstuk 10 voor de volledige fasering (Fase 1 t/m 6).
-Nu actief: Fase 1 — authenticatie + dashboard-skelet (nog geen agents).
+Zie technische blauwdruk hoofdstuk 10 en agent-blauwdrukken hoofdstuk 17 voor de volledige
+fasering en samenwerkingsketen tussen agents.
+
+Nu actief: Fase 1 is afgerond (auth, dashboard-skelet, onboarding, Instagram OAuth).
+Volgende stap: Fase 2 — Website Analysis Agent.
 
 ## Toekomstige ideeën (nog niet plannen, wel onthouden)
-- Shopify-koppeling: conversies/verkopen uitlezen (Fase 6)
+- Shopify-koppeling: conversies/verkopen uitlezen (Fase 6, voedt Sales Sync Agent)
 - Automatische ad-generatie bij nieuwe productdrops (uitbreiding Ads Manager Agent, na Fase 5)
 
 ## Bedrijfsmatige zaken (regelen vóór eerste betalende klant, niet nu bouwen)

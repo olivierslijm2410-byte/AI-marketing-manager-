@@ -1,16 +1,52 @@
-# React + Vite
+# AI Marketing Manager
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Nederlandstalig SaaS-platform dat kleine ondernemers (webshops, lokale dienstverleners,
+freelancers/coaches) een AI-marketingmedewerker geeft: het analyseert hun bedrijf, stelt
+een contentplan op, schrijft en plaatst content, en rapporteert de resultaten in gewone
+taal. Gebouwd door OS Digital Commerce.
 
-Currently, two official plugins are available:
+## Stack
+- **Frontend**: React + Vite (React Router DOM)
+- **Backend/database**: Supabase (Frankfurt regio)
+- **Hosting**: Vercel
+- **AI**: Anthropic Claude API
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Huidige status
+Fase 1 is afgerond: authenticatie, dashboard-skelet, onboardingflow en Instagram OAuth
+werken end-to-end. Volgende stap: Fase 2 — Website Analysis Agent.
+Zie `CLAUDE.md` voor de meest actuele fase en coding-regels.
 
-## React Compiler
+## Lokaal draaien
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+npm run dev
+```
 
-## Expanding the ESLint configuration
+Vereiste environment-variabelen (zie projecteigenaar voor de waarden):
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_INSTAGRAM_CLIENT_ID`
+- `VITE_INSTAGRAM_REDIRECT_URI`
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm run build     # productie-build
+npm run lint       # altijd draaien vóór een commit
+npm run preview    # lokale preview van de build
+```
+
+## Documentatie in deze repo
+- **CLAUDE.md** — projectinstructies voor Claude Code (stack, regels, huidige fase)
+- **AGENTS.md** — overzicht van alle 14 AI-agents en hun bouwstatus
+- **docs/businessplan.md** — verkort businessplan: idee, doelgroep, concurrentie, verdienmodel
+- **docs/technische-blauwdruk.md** — verkorte technische architectuur en roadmap
+- **docs/ux-ui-blauwdruk.md** — verkorte UX/UI-structuur van website en dashboard
+- **docs/stappenplan.md** — verkort stappenplan van nu tot eerste klanten
+- **docs/agent-blauwdrukken.md** — aanvulling op AGENTS.md: edge cases, kosten, samenwerkingsketen
+- **docs/database-schema.md** — overzicht van de Supabase-tabellen
+
+## Let op
+De bestanden in `docs/` zijn verkorte versies. De volledige, uitgebreide documenten staan
+in het Claude Project (niet in deze repo). Bij grote scope- of ontwerpvragen: raadpleeg
+die volledige documenten. Bij twijfel over een detail tijdens het coderen: de bestanden
+hier in `docs/` zijn meestal genoeg.

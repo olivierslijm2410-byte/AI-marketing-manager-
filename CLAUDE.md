@@ -9,9 +9,13 @@
 - AI: Anthropic Claude API
 
 ## Projectdocumentatie
-Alle scope- en ontwerpbeslissingen staan in het Claude Project (niet in deze repo):
-businessplan, technische blauwdruk, UX/UI-blauwdruk, stappenplan, agent-blauwdrukken,
-database schema blauwdruk. Bij twijfel over scope of ontwerp: raadpleeg deze documenten eerst.
+Verkorte versies van alle 6 blauwdrukken staan in `docs/` in deze repo:
+businessplan, technische-blauwdruk, ux-ui-blauwdruk, stappenplan, agent-blauwdrukken,
+database-schema. Lees het relevante bestand uit `docs/` op het moment dat het nodig is
+(niet automatisch laden bij elke sessie).
+
+De volledige, uitgebreide versies staan in het Claude Project — alleen nodig bij grote
+scope- of ontwerpvragen, niet voor dagelijks werk.
 
 ## Regels
 - Secrets altijd via .env, nooit hardcoded in code
@@ -29,14 +33,13 @@ Fase 1 is afgerond: authenticatie, dashboard-skelet, onboardingflow én Instagra
 (koppelen, token-opslag, callback) werken end-to-end.
 
 Volgende stap: Fase 2 — Website Analysis Agent + opslag bedrijfsgegevens
-(zie technische blauwdruk hoofdstuk 10, stappenplan stap 3).
+(zie docs/technische-blauwdruk.md, docs/stappenplan.md stap 3).
 
 Let op: Anthropic API-billing activeren staat nog open — dit is een harde vereiste
-vóórdat de eerste agent daadwerkelijk kan draaien (stappenplan stap 2).
+vóórdat de eerste agent daadwerkelijk kan draaien (docs/stappenplan.md stap 2).
 
 ## Bekende afwijkingen van de blauwdrukken
 - `channels`-tabel gebruikt in code: `user_id`, `platform`, `instagram_account_id`,
   `access_token`, `token_expires_at`, `connected_at`.
-  De Database Schema Blauwdruk gebruikte `type`, `status`, `external_account_id`,
-  `last_synced_at` — dat document is op dit punt nog niet bijgewerkt naar de echte kolommen.
+  docs/database-schema.md is hierop al bijgewerkt naar de echte kolommen.
   

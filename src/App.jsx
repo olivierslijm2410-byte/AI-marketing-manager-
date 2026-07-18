@@ -5,6 +5,7 @@ import DashboardLayout from './components/DashboardLayout'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Onboarding from './pages/Onboarding'
+import InstagramCallback from './pages/InstagramCallback'
 import Overzicht from './pages/dashboard/Overzicht'
 import Kanalen from './pages/dashboard/Kanalen'
 import Strategie from './pages/dashboard/Strategie'
@@ -24,6 +25,14 @@ function App() {
             <OnboardingGuard>
               <Onboarding />
             </OnboardingGuard>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/auth/instagram/callback"
+        element={
+          <ProtectedRoute>
+            <InstagramCallback />
           </ProtectedRoute>
         }
       />

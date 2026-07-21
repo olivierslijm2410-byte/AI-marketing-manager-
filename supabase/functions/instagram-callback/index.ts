@@ -1,13 +1,24 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+}
+
 Deno.serve(async (req) => {
+  // Preflight-check afhandelen
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders })
+  }
+
   try {
     const { code } = await req.json()
 
     if (!code) {
       return new Response(JSON.stringify({ error: "Geen code ontvangen" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       })
     }
 
@@ -15,7 +26,6 @@ Deno.serve(async (req) => {
     const appSecret = Deno.env.get("INSTAGRAM_APP_SECRET")
     const redirectUri = Deno.env.get("INSTAGRAM_REDIRECT_URI")
 
-    // Stap 1: code omwisselen voor short-lived token
     const tokenRes = await fetch("https://api.instagram.com/oauth/access_token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -33,13 +43,12 @@ Deno.serve(async (req) => {
     if (!tokenRes.ok) {
       return new Response(JSON.stringify({ error: "Token-uitwisseling mislukt", details: tokenData }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       })
     }
 
     const { access_token: shortLivedToken, user_id: instagramUserId } = tokenData
 
-    // Stap 2: omwisselen voor long-lived token (60 dagen)
     const longLivedRes = await fetch(
       `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${appSecret}&access_token=${shortLivedToken}`
     )
@@ -51,12 +60,12 @@ Deno.serve(async (req) => {
         expires_in: longLivedData.expires_in,
         instagram_user_id: instagramUserId,
       }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     )
   } catch (err) {
     return new Response(JSON.stringify({ error: "Onverwachte fout", details: String(err) }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     })
   }
-})
+}) 

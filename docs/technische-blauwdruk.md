@@ -60,11 +60,14 @@ kosten per klant bijhouden. Zware schaal-oplossingen: pas als het echt nodig bli
   klantdata gebruikt om eigen modellen te trainen
 
 ## Roadmap (fases)
-| Fase | Wat | Status |
-|---|---|---|
-| 1 — Fundament | Auth, dashboard-skelet, onboarding, Instagram-koppeling | 🟢 Afgerond |
-| 2 — Analyse | Website Analysis Agent, opslag bedrijfsgegevens | 🔴 Volgende stap |
-| 3 — Content genereren | Content Strategy, Copywriting, Image Generation Agent | 🔴 |
-| 4 — Publiceren en meten | Social Media Agent, basis-analytics | 🔴 |
-| 5 — Advertenties | Meta-verificatie, Ads Manager Agent, Google Ads | 🔴 |
-| 6 — Optimalisatie | Analytics/Reporting verfijnen, TikTok/Shopify, video | 🔴 | 
+> Status van elke fase staat alleen in CLAUDE.md ("Huidige fase") — hieronder alleen de
+> vaste inhoud per fase.
+
+| Fase | Wat |
+|---|---|
+| 1 — Fundament | Auth, dashboard-skelet, onboarding, Instagram-koppeling |
+| 2 — Analyse | Website Analysis Agent, opslag bedrijfsgegevens |
+| 3 — Content genereren | Content Strategy, Copywriting, Image Generation Agent |
+| 4 — Publiceren en meten | Social Media Agent, basis-analytics |
+| 5 — Advertenties | Meta-verificatie, Ads Manager Agent, Google Ads |
+| 6 — Optimalisatie | Analytics/Reporting verfijnen, TikTok/Shopify, video |

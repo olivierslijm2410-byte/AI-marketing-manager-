@@ -27,13 +27,18 @@ scope- of ontwerpvragen, niet voor dagelijks werk.
   doordachte instructie ingebouwd
 - Als code afwijkt van een blauwdruk (bijv. kolomnamen in Supabase): de werkende code is
   leidend. Meld de afwijking expliciet, overschrijf de blauwdruk niet stilzwijgend.
+- Dit bestand (CLAUDE.md) is de ENIGE plek waar de actuele fase/status hoort te staan.
+  docs/stappenplan.md en docs/technische-blauwdruk.md verwijzen ernaar in plaats van hun
+  eigen status bij te houden. Zodra een stap of fase is afgerond: werk de sectie
+  "Huidige fase" hieronder bij, vóór de commit.
 
-## Huidige fase
+## Huidige fase — enige bron van waarheid voor status
 Fase 1 is afgerond: authenticatie, dashboard-skelet, onboardingflow én Instagram OAuth
 (koppelen, token-opslag, callback) werken end-to-end.
 
 Volgende stap: Fase 2 — Website Analysis Agent + opslag bedrijfsgegevens
-(zie docs/technische-blauwdruk.md, docs/stappenplan.md stap 3).
+(zie docs/technische-blauwdruk.md, docs/stappenplan.md stap 3 voor de volledige,
+vaste inhoud van elke stap — status van elke stap staat alleen hier).
 
 Let op: Anthropic API-billing activeren staat nog open — dit is een harde vereiste
 vóórdat de eerste agent daadwerkelijk kan draaien (docs/stappenplan.md stap 2).

@@ -9,11 +9,13 @@ Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
 
 ## Fase 2-3 (MVP — bouwen we eerst)
 
-### 1. Website Analysis Agent 🔴
+### 1. Website Analysis Agent 🟢
 - Doel: bedrijf en aanbod begrijpen vanuit de website
 - Input: website-URL
 - Output: samenvatting (producten, doelgroep, tone of voice)
 - Model: Claude Haiku of Sonnet (geen zware taak, houd kosten laag)
+- Gebouwd, gedeployed en getest: succesvol scenario + foutscenario, beide
+  correct afgehandeld en opgeslagen in company_analyses.
 
 ### 2. Content Strategy Agent 🔴
 - Doel: concreet contentplan maken

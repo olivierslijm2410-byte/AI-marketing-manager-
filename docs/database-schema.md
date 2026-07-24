@@ -35,13 +35,27 @@ RLS: `auth.uid() = user_id`.
 > Zodra er andere kanaaltypes bijkomen (website, tiktok, ...) waarschijnlijk een `type`-
 > of `platform`-generieke aanpak nodig — nu nog instagram-specifiek ingericht.
 
+### company_analyses 🟢 — LET OP: dit zijn de echte kolommen uit de code, niet het oorspronkelijke voorstel
+| Kolom | Type | Omschrijving |
+|---|---|---|
+| id | uuid | PK |
+| user_id | uuid | FK → profiles.id (uit JWT, niet uit request body) |
+| channel_id | uuid | FK → channels.id |
+| summary_json | jsonb | Output Website Analysis Agent (producten_diensten, doelgroep, tone_of_voice, usps, zekerheid, toelichting) |
+| versie | integer | Ophogend per channel_id, niet globaal |
+| status | text | 'compleet' \| 'lage_zekerheid' \| 'mislukt' |
+| created_at | timestamptz | |
+
+RLS: alleen SELECT voor `auth.uid() = user_id`. INSERT gebeurt uitsluitend server-side
+via de `analyze-website` Edge Function (service role, bypast RLS) — zie
+agent-blauwdrukken.md.
+
 ## Nog te bouwen (voorstel — pas aan zodra je de bijbehorende agent bouwt)
 
 | Tabel | Doel | Belangrijkste kolommen |
 |---|---|---|
 | subscriptions | Abonnement per gebruiker | user_id, plan, status, ai_content_limit |
 | ai_usage | AI-verbruik per maand | user_id, month, content_generated_count, image_generated_count, limit_reached |
-| company_analyses | Output Website Analysis Agent | user_id, channel_id, summary_json, confidence_level, version |
 | concurrent_analyses | Output Market/Competitor Research Agent | user_id, industry, location, summary_json |
 | strategy_versions | Contentplan-versies | user_id, company_analysis_id, plan_json, status, version, feedback_text |
 | posts | Individuele posts | user_id, strategy_version_id, channel_id, caption, hashtags, image_url, video_url, status, scheduled_at, published_at, platform_post_id |

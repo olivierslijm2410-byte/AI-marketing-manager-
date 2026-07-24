@@ -40,8 +40,8 @@ Volgende stap: Fase 2 — Website Analysis Agent + opslag bedrijfsgegevens
 (zie docs/technische-blauwdruk.md, docs/stappenplan.md stap 3 voor de volledige,
 vaste inhoud van elke stap — status van elke stap staat alleen hier).
 
-Let op: Anthropic API-billing activeren staat nog open — dit is een harde vereiste
-vóórdat de eerste agent daadwerkelijk kan draaien (docs/stappenplan.md stap 2).
+Anthropic API-billing is geactiveerd (was docs/stappenplan.md stap 2) — agents kunnen
+nu daadwerkelijk AI-calls uitvoeren.
 
 ## Bekende afwijkingen van de blauwdrukken
 - `channels`-tabel gebruikt in code: `user_id`, `platform`, `instagram_account_id`,

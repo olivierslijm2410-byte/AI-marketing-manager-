@@ -5,7 +5,7 @@ Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
 ## Infrastructuur (geen agent, wel vereist voor de agents hieronder)
 - Instagram OAuth-koppeling 🟢 — authorize-flow, callback edge function
   (token-uitwisseling), opslag in channels-tabel. Werkt end-to-end.
-- Anthropic API-billing 🔴 — sleutel staat klaar, billing nog niet geactiveerd
+- Anthropic API-billing 🟢 — geactiveerd, agents kunnen nu daadwerkelijk AI-calls uitvoeren
 
 ## Fase 2-3 (MVP — bouwen we eerst)
 

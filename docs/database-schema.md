@@ -24,13 +24,17 @@ RLS: `auth.uid() = id`.
 |---|---|---|
 | id | uuid | PK |
 | user_id | uuid | FK → profiles.id |
-| platform | text | bijv. 'instagram' |
+| platform | text | bijv. 'instagram', 'website' |
 | instagram_account_id | text | Instagram user-id |
 | access_token | text | Long-lived token |
 | token_expires_at | timestamptz | Vervalmoment token |
 | connected_at | timestamptz | Koppelmoment |
+| website_url | text | Alleen ingevuld voor platform = 'website' |
 
 RLS: `auth.uid() = user_id`.
+
+Check-constraint: `platform = 'website'` vereist een ingevulde `website_url`. Voor
+andere platforms is er geen vereiste dat `website_url` leeg blijft.
 
 > Zodra er andere kanaaltypes bijkomen (website, tiktok, ...) waarschijnlijk een `type`-
 > of `platform`-generieke aanpak nodig — nu nog instagram-specifiek ingericht.

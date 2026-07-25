@@ -14,8 +14,12 @@ Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
 - Input: website-URL
 - Output: samenvatting (producten, doelgroep, tone of voice)
 - Model: Claude Haiku of Sonnet (geen zware taak, houd kosten laag)
-- Gebouwd, gedeployed en getest: succesvol scenario + foutscenario, beide
+- Backend gebouwd, gedeployed en getest: succesvol scenario + foutscenario, beide
   correct afgehandeld en opgeslagen in company_analyses.
+- Frontend-koppeling op Kanalen.jsx ook klaar: website koppelen (URL-form),
+  analyse starten/herstarten, en status (bezig/geanalyseerd/mislukt) tonen —
+  inclusief na page refresh. Alleen het tonen van de inhoud van summary_json
+  op de Strategie-pagina staat nog open (volgende stap).
 
 ### 2. Content Strategy Agent 🔴
 - Doel: concreet contentplan maken

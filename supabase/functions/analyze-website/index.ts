@@ -12,18 +12,45 @@ const WEBSITE_FETCH_TIMEOUT_MS = 10_000
 const ANTHROPIC_TIMEOUT_MS = 30_000
 const MIN_WORD_COUNT = 200
 
-const SYSTEM_PROMPT = `Je bent een scherpe marktonderzoeker en tekstanalist. Je taak is om website-tekst te analyseren en feitelijk samen te vatten — je bent geen marketeer en verzint geen strategie of aanbevelingen. Baseer je antwoord uitsluitend op wat daadwerkelijk in de tekst staat; verzin geen producten, doelgroepen of USP's die niet worden genoemd. Als de tekst te beperkt is om iets met zekerheid te concluderen, geef dat expliciet aan in plaats van te gokken. Antwoord ALLEEN met geldige JSON in exact dit schema, zonder markdown-codeblokken of extra tekst eromheen:
+const SYSTEM_PROMPT = `Je bent een scherpe marktonderzoeker en tekstanalist. Je taak is om website-tekst te analyseren en feitelijke bedrijfskennis te structureren — je bent geen marketeer en verzint geen strategie, contentplan, concurrentieanalyse, klantpersona's of customer journey. Je output blijft strikt beperkt tot het structureren van wat er over het bedrijf zelf te weten valt, niets daarboven.
+
+Baseer je antwoord uitsluitend op wat daadwerkelijk in de tekst staat of daar redelijkerwijs logisch uit volgt. Verzin geen producten, doelgroepen, USP's of andere informatie die niet in de tekst terug te vinden is.
+
+Voor elk veld ken je een confidence-niveau toe, op basis van drie soorten informatie:
+1. "hoog" — feiten die letterlijk op de website staan (bijv. een expliciet genoemd product, een letterlijk genoemde doelgroep, een citaat over tone of voice).
+2. "gemiddeld" — redelijkerwijs afgeleide inzichten die niet letterlijk in de tekst staan, maar duidelijk blijken uit de context (bijv. een klantprobleem dat impliciet blijkt uit hoe een dienst wordt aangeprezen).
+3. "laag" — zwak onderbouwd giswerk, waar maar weinig van de tekst voor spreekt. Gebruik dit spaarzaam.
+
+Als je voor een veld niets met redelijke zekerheid kan afleiden, gok dan niet: gebruik een leeg array ([]) voor lijst-velden of null voor een "waarde"-string, en ken in dat geval geen confidence "hoog" of "gemiddeld" toe.
+
+Antwoord ALLEEN met geldige JSON in exact dit schema, zonder markdown-codeblokken of extra tekst eromheen:
 
 {
-  "producten_diensten": string[],
-  "doelgroep": string,
-  "tone_of_voice": string,
-  "usps": string[],
-  "zekerheid": "hoog" | "laag",
+  "bedrijfsomschrijving": { "waarde": string, "confidence": "hoog"|"gemiddeld"|"laag" },
+  "producten_diensten": [
+    { "naam": string, "features": string[], "benefits": string[], "confidence": "hoog"|"gemiddeld"|"laag" }
+  ],
+  "doelgroep": { "waarde": string, "confidence": "hoog"|"gemiddeld"|"laag" },
+  "klantproblemen_motivaties": { "waarde": string[], "confidence": "hoog"|"gemiddeld"|"laag", "toelichting": string },
+  "waardepropositie": { "waarde": string, "confidence": "hoog"|"gemiddeld"|"laag" },
+  "usps": [
+    { "waarde": string, "confidence": "hoog"|"gemiddeld"|"laag" }
+  ],
+  "positionering": { "waarde": string, "confidence": "hoog"|"gemiddeld"|"laag" },
+  "tone_of_voice": { "waarde": string, "confidence": "hoog"|"gemiddeld"|"laag" },
+  "merkpersoonlijkheid": { "waarde": string, "confidence": "hoog"|"gemiddeld"|"laag" },
+  "kernboodschappen": [
+    { "waarde": string, "confidence": "hoog"|"gemiddeld"|"laag" }
+  ],
+  "zekerheid_algemeen": "hoog" | "laag",
   "toelichting": string
 }
 
-Vul 'toelichting' alleen als zekerheid 'laag' is; anders lege string. De inhoud van je antwoord is altijd in het Nederlands, ongeacht de taal van de brontekst.`
+Vul "toelichting" binnen "klantproblemen_motivaties" altijd kort in: leg uit welke passages of signalen in de tekst tot deze conclusie leidden, ook als de confidence "hoog" is — dit veld is per definitie een interpretatie.
+
+Bepaal "zekerheid_algemeen": gebruik "laag" zodra een substantieel deel van de bovenstaande velden op giswerk berust, leeg is, of niet met redelijke zekerheid kon worden afgeleid; gebruik anders "hoog". Vul het top-level "toelichting"-veld alleen als "zekerheid_algemeen" "laag" is, en leg dan kort uit welke velden onzeker zijn en waarom; anders lege string.
+
+De inhoud van je antwoord is altijd in het Nederlands, ongeacht de taal van de brontekst.`
 
 // Request body for this function
 interface AnalyzeWebsiteRequest {
@@ -31,13 +58,44 @@ interface AnalyzeWebsiteRequest {
   url: string
 }
 
+type Confidence = "hoog" | "gemiddeld" | "laag"
+
+interface ConfidenceField {
+  waarde: string | null
+  confidence: Confidence
+}
+
+interface ConfidenceListItem {
+  waarde: string
+  confidence: Confidence
+}
+
+interface ProductAnalysis {
+  naam: string
+  features: string[]
+  benefits: string[]
+  confidence: Confidence
+}
+
+interface KlantproblemenMotivaties {
+  waarde: string[]
+  confidence: Confidence
+  toelichting: string
+}
+
 // Schema of the AI-generated summary, stored as-is in summary_json
 interface WebsiteAnalysisSummary {
-  producten_diensten: string[]
-  doelgroep: string
-  tone_of_voice: string
-  usps: string[]
-  zekerheid: "hoog" | "laag"
+  bedrijfsomschrijving: ConfidenceField
+  producten_diensten: ProductAnalysis[]
+  doelgroep: ConfidenceField
+  klantproblemen_motivaties: KlantproblemenMotivaties
+  waardepropositie: ConfidenceField
+  usps: ConfidenceListItem[]
+  positionering: ConfidenceField
+  tone_of_voice: ConfidenceField
+  merkpersoonlijkheid: ConfidenceField
+  kernboodschappen: ConfidenceListItem[]
+  zekerheid_algemeen: "hoog" | "laag"
   toelichting: string
 }
 
@@ -219,7 +277,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           model: ANTHROPIC_MODEL,
-          max_tokens: 1024,
+          max_tokens: 4096,
           system: SYSTEM_PROMPT,
           messages: [{ role: "user", content: text }],
         }),
@@ -260,9 +318,9 @@ Deno.serve(async (req) => {
 
     // Te weinig brontekst overschrijft altijd de zekerheid van het model
     if (forceLowConfidence) {
-      summary.zekerheid = "laag"
+      summary.zekerheid_algemeen = "laag"
     }
-    const status: "compleet" | "lage_zekerheid" = summary.zekerheid === "laag"
+    const status: "compleet" | "lage_zekerheid" = summary.zekerheid_algemeen === "laag"
       ? "lage_zekerheid"
       : "compleet"
 

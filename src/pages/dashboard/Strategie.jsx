@@ -4,6 +4,162 @@ import { supabase } from '../../supabaseClient'
 import { useAuth } from '../../context/useAuth'
 
 const ANALYSIS_ERROR_MESSAGE = 'Analyse mislukt, probeer opnieuw.'
+const NOT_INFERRABLE = 'Niet af te leiden uit de website'
+
+const cardStyle = {
+  textAlign: 'left',
+  border: '1px solid var(--border)',
+  borderRadius: '4px',
+  padding: '24px',
+}
+
+function isConfidenceField(field) {
+  return Boolean(field) && typeof field === 'object' && !Array.isArray(field) && 'waarde' in field
+}
+
+function isProduct(item) {
+  return Boolean(item) && typeof item === 'object' && !Array.isArray(item) && typeof item.naam === 'string'
+}
+
+function displayValue(waarde) {
+  return waarde === null || waarde === undefined || waarde === '' ? NOT_INFERRABLE : waarde
+}
+
+function ConfidenceBadge({ confidence }) {
+  if (confidence !== 'hoog' && confidence !== 'gemiddeld' && confidence !== 'laag') {
+    return null
+  }
+
+  const style = {
+    marginLeft: '8px',
+    fontSize: '0.75em',
+    color: 'var(--text)',
+  }
+
+  if (confidence === 'laag') {
+    style.fontStyle = 'italic'
+    style.border = '1px dotted var(--border)'
+    style.borderRadius = '3px'
+    style.padding = '0 5px'
+  }
+
+  return <span style={style}>{confidence}</span>
+}
+
+function ScalarField({ label, field }) {
+  if (!isConfidenceField(field)) return null
+
+  return (
+    <>
+      <h2>{label}</h2>
+      <p>
+        {displayValue(field.waarde)}
+        <ConfidenceBadge confidence={field.confidence} />
+      </p>
+    </>
+  )
+}
+
+function ConfidenceList({ label, items }) {
+  if (!Array.isArray(items)) return null
+  const validItems = items.filter(isConfidenceField)
+
+  return (
+    <>
+      <h2>{label}</h2>
+      {validItems.length === 0 ? (
+        <p>{NOT_INFERRABLE}</p>
+      ) : (
+        <ul>
+          {validItems.map((item, index) => (
+            <li key={`${item.waarde}-${index}`}>
+              {displayValue(item.waarde)}
+              <ConfidenceBadge confidence={item.confidence} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  )
+}
+
+function ProductList({ products }) {
+  if (!Array.isArray(products)) return null
+  const validProducts = products.filter(isProduct)
+
+  return (
+    <>
+      <h2>Producten/diensten</h2>
+      {validProducts.length === 0 ? (
+        <p>{NOT_INFERRABLE}</p>
+      ) : (
+        validProducts.map((product, index) => {
+          const features = Array.isArray(product.features) ? product.features : []
+          const benefits = Array.isArray(product.benefits) ? product.benefits : []
+
+          return (
+            <div key={`${product.naam}-${index}`} style={{ marginBottom: '16px' }}>
+              <p style={{ fontWeight: 600 }}>
+                {displayValue(product.naam)}
+                <ConfidenceBadge confidence={product.confidence} />
+              </p>
+              {features.length > 0 && (
+                <>
+                  <p style={{ fontSize: '0.85em', color: 'var(--text)', margin: '4px 0 2px' }}>
+                    Features
+                  </p>
+                  <ul>
+                    {features.map((feature, featureIndex) => (
+                      <li key={`${feature}-${featureIndex}`}>{feature}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {benefits.length > 0 && (
+                <>
+                  <p style={{ fontSize: '0.85em', color: 'var(--text)', margin: '4px 0 2px' }}>
+                    Benefits
+                  </p>
+                  <ul>
+                    {benefits.map((benefit, benefitIndex) => (
+                      <li key={`${benefit}-${benefitIndex}`}>{benefit}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          )
+        })
+      )}
+    </>
+  )
+}
+
+function KlantproblemenBlock({ field }) {
+  if (!isConfidenceField(field)) return null
+  const items = Array.isArray(field.waarde) ? field.waarde : []
+
+  return (
+    <>
+      <h2>
+        Klantproblemen &amp; motivaties
+        <ConfidenceBadge confidence={field.confidence} />
+      </h2>
+      {items.length === 0 ? (
+        <p>{NOT_INFERRABLE}</p>
+      ) : (
+        <ul>
+          {items.map((item, index) => (
+            <li key={`${item}-${index}`}>{item}</li>
+          ))}
+        </ul>
+      )}
+      {field.toelichting && (
+        <p style={{ fontSize: '0.85em', color: 'var(--text)' }}>{field.toelichting}</p>
+      )}
+    </>
+  )
+}
 
 export default function Strategie() {
   const { user } = useAuth()
@@ -144,18 +300,23 @@ export default function Strategie() {
     }
 
     const summary = analysisRecord.summary_json ?? {}
-    const producten = summary.producten_diensten ?? []
-    const usps = summary.usps ?? []
+    const isNewFormatSummary = isConfidenceField(summary.bedrijfsomschrijving)
+
+    if (!isNewFormatSummary) {
+      return (
+        <div style={cardStyle}>
+          <p>Verouderd analyseformaat — analyseer deze website opnieuw om de volledige analyse te zien.</p>
+          <p>
+            Laatste analyse: versie {analysisRecord.versie}, {formatDate(analysisRecord.created_at)}
+          </p>
+          {reanalyzeButton}
+          {analysisStatus === 'error' && <p>{analysisError}</p>}
+        </div>
+      )
+    }
 
     return (
-      <div
-        style={{
-          textAlign: 'left',
-          border: '1px solid var(--border)',
-          borderRadius: '4px',
-          padding: '24px',
-        }}
-      >
+      <div style={cardStyle}>
         {analysisRecord.status === 'lage_zekerheid' && (
           <div
             style={{
@@ -171,25 +332,16 @@ export default function Strategie() {
           </div>
         )}
 
-        <h2>Producten/diensten</h2>
-        <ul>
-          {producten.map((item, index) => (
-            <li key={`${item}-${index}`}>{item}</li>
-          ))}
-        </ul>
-
-        <h2>Doelgroep</h2>
-        <p>{summary.doelgroep}</p>
-
-        <h2>Tone of voice</h2>
-        <p>{summary.tone_of_voice}</p>
-
-        <h2>USP&apos;s</h2>
-        <ul>
-          {usps.map((item, index) => (
-            <li key={`${item}-${index}`}>{item}</li>
-          ))}
-        </ul>
+        <ScalarField label="Bedrijfsomschrijving" field={summary.bedrijfsomschrijving} />
+        <ProductList products={summary.producten_diensten} />
+        <ScalarField label="Doelgroep" field={summary.doelgroep} />
+        <KlantproblemenBlock field={summary.klantproblemen_motivaties} />
+        <ScalarField label="Waardepropositie" field={summary.waardepropositie} />
+        <ConfidenceList label="USP's" items={summary.usps} />
+        <ScalarField label="Positionering" field={summary.positionering} />
+        <ScalarField label="Tone of voice" field={summary.tone_of_voice} />
+        <ScalarField label="Merkpersoonlijkheid" field={summary.merkpersoonlijkheid} />
+        <ConfidenceList label="Kernboodschappen" items={summary.kernboodschappen} />
 
         <p>
           Laatste analyse: versie {analysisRecord.versie}, {formatDate(analysisRecord.created_at)}

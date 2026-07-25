@@ -1,10 +1,36 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import { useAuth } from '../context/useAuth'
+
+// Instagram stuurt bij een geweigerde autorisatie geen 'code' terug, maar
+// 'error' + 'error_reason' als losse query-parameters op de callback-URL.
+function getDeniedAuthMessage(errorReason) {
+  if (errorReason === 'user_denied') {
+    return 'Je hebt geen toestemming gegeven aan Instagram. Koppel opnieuw als je dit alsnog wilt doen.'
+  }
+  return 'Instagram heeft de koppeling geweigerd. Probeer het opnieuw.'
+}
+
+// Vertaalt bekende foutcodes/berichten van de Edge Function (afkomstig van de
+// Instagram API) naar begrijpelijke NL-tekst. Onbekende fouten krijgen een
+// nette generieke melding in plaats van rauwe API-data.
+function getFriendlyApiErrorMessage(data) {
+  const rawMessage = JSON.stringify(data?.details || '').toLowerCase()
+
+  if (rawMessage.includes('not a business') || rawMessage.includes('not an instagram business')) {
+    return 'Dit Instagram-account is geen Business- of Creator-account. Zet je account eerst om via Instagram-instellingen en probeer opnieuw.'
+  }
+  if (rawMessage.includes('code has expired') || rawMessage.includes('invalid authorization code')) {
+    return 'De koppelpoging is verlopen. Klik opnieuw op "Koppel Instagram" om het nogmaals te proberen.'
+  }
+  if (rawMessage.includes('invalid') && rawMessage.includes('token')) {
+    return 'Instagram gaf een ongeldig token terug. Probeer opnieuw te koppelen.'
+  }
+
+  return 'Koppelen met Instagram is mislukt. Probeer het opnieuw.'
+}
 
 export default function InstagramCallback() {
-  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const [status, setStatus] = useState('loading')
@@ -16,10 +42,29 @@ export default function InstagramCallback() {
     hasRun.current = true
 
     const code = searchParams.get('code')
+    const authError = searchParams.get('error')
+    const errorReason = searchParams.get('error_reason')
 
     async function connectInstagram() {
+      // Instagram stuurde een expliciete weigering terug (geen 'code')
+      if (authError) {
+        setError(getDeniedAuthMessage(errorReason))
+        setStatus('error')
+        return
+      }
+
       if (!code) {
-        setError('Geen autorisatiecode ontvangen van Instagram.')
+        setError('Geen autorisatiecode ontvangen van Instagram. Probeer opnieuw.')
+        setStatus('error')
+        return
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session) {
+        setError('Geen geldige sessie. Log opnieuw in.')
         setStatus('error')
         return
       }
@@ -28,7 +73,10 @@ export default function InstagramCallback() {
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/instagram-callback`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
           body: JSON.stringify({ code }),
         }
       )
@@ -36,39 +84,7 @@ export default function InstagramCallback() {
       const data = await response.json()
 
       if (!response.ok || data.error) {
-        setError(data.error || 'Koppelen met Instagram is mislukt.')
-        setStatus('error')
-        return
-      }
-
-      const {
-        access_token: accessToken,
-        expires_in: expiresIn,
-        instagram_user_id: instagramUserId,
-      } = data
-
-      const { data: existingChannel } = await supabase
-        .from('channels')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('platform', 'instagram')
-        .maybeSingle()
-
-      const channelData = {
-        user_id: user.id,
-        platform: 'instagram',
-        instagram_account_id: instagramUserId,
-        access_token: accessToken,
-        token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
-        connected_at: new Date().toISOString(),
-      }
-
-      const { error: saveError } = existingChannel
-        ? await supabase.from('channels').update(channelData).eq('id', existingChannel.id)
-        : await supabase.from('channels').insert(channelData)
-
-      if (saveError) {
-        setError(saveError.message)
+        setError(getFriendlyApiErrorMessage(data))
         setStatus('error')
         return
       }
@@ -77,7 +93,7 @@ export default function InstagramCallback() {
     }
 
     connectInstagram()
-  }, [searchParams, user.id])
+  }, [searchParams])
 
   useEffect(() => {
     if (status !== 'success') return
@@ -94,7 +110,14 @@ export default function InstagramCallback() {
       <h1>Instagram koppelen</h1>
       {status === 'loading' && <p>Bezig met koppelen van je Instagram-account...</p>}
       {status === 'success' && <p>Instagram is succesvol gekoppeld. Je wordt doorgestuurd...</p>}
-      {status === 'error' && <p>{error}</p>}
+      {status === 'error' && (
+        <div>
+          <p>{error}</p>
+          <button type="button" onClick={() => navigate('/dashboard/kanalen')}>
+            Terug naar Kanalen
+          </button>
+        </div>
+      )}
     </div>
   )
 }

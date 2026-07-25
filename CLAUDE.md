@@ -36,8 +36,13 @@ scope- of ontwerpvragen, niet voor dagelijks werk.
 Fase 1 is afgerond: authenticatie, dashboard-skelet, onboardingflow én Instagram OAuth
 (koppelen, token-opslag, callback) werken end-to-end.
 
-Volgende stap: Fase 2 — Website Analysis Agent + opslag bedrijfsgegevens
-(zie docs/technische-blauwdruk.md, docs/stappenplan.md stap 3 voor de volledige,
+Fase 2 is afgerond: Website Analysis Agent volledig gebouwd en getest — backend
+(analyze-website Edge Function, opslag in company_analyses), frontend-koppeling op
+Kanalen.jsx (website koppelen, analyse starten/herstarten, statusweergave) én de
+bedrijfsanalyse-kaart met "opnieuw analyseren" op Strategie.jsx.
+
+Volgende stap: Fase 3 — Content Strategy, Copywriting & Image Agent
+(zie docs/technische-blauwdruk.md, docs/stappenplan.md stap 4 voor de volledige,
 vaste inhoud van elke stap — status van elke stap staat alleen hier).
 
 Anthropic API-billing is geactiveerd (was docs/stappenplan.md stap 2) — agents kunnen

@@ -36,21 +36,35 @@ export default function Onboarding() {
     }
 
     setSubmitting(true)
+
     const { error: upsertError } = await supabase.from('profiles').upsert({
       id: user.id,
       branche,
       doelen,
-      website_url: websiteUrl,
       onboarding_completed: true,
     })
-    setSubmitting(false)
 
     if (upsertError) {
+      setSubmitting(false)
       setError(upsertError.message)
       return
     }
 
-    navigate('/dashboard')
+    // Website-URL wordt direct als channel aangemaakt (zelfde tabel/vorm als
+    // een handmatige koppeling via de Kanalen-pagina), zodat er nog maar één
+    // plek is waar de website-koppeling van een gebruiker staat.
+    const { error: channelError } = await supabase
+      .from('channels')
+      .insert({ user_id: user.id, platform: 'website', website_url: websiteUrl })
+
+    setSubmitting(false)
+
+    if (channelError) {
+      setError(channelError.message)
+      return
+    }
+
+    navigate('/dashboard/kanalen')
   }
 
   return (

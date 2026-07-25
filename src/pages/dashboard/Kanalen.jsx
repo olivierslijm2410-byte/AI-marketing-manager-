@@ -96,6 +96,13 @@ export default function Kanalen() {
           } else {
             setAnalysisStatus('success')
           }
+        } else {
+          // Kanaal bestaat, maar is nog nooit geanalyseerd (bijv. net
+          // aangemaakt via onboarding) — start de analyse automatisch zodat
+          // dit niet afhangt van een handmatige klik op "Opnieuw analyseren".
+          setWebsiteLoading(false)
+          runWebsiteAnalysis(channel.id, channel.website_url)
+          return
         }
       }
 

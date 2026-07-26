@@ -15,3 +15,9 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/analyze-website/deno.json"
 entrypoint = "./functions/analyze-website/index.ts"
+
+[functions.analyze-strategy]
+enabled = true
+verify_jwt = true
+import_map = "./functions/analyze-strategy/deno.json"
+entrypoint = "./functions/analyze-strategy/index.ts"

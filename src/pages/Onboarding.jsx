@@ -16,6 +16,7 @@ export default function Onboarding() {
   const { user } = useAuth()
   const [branche, setBranche] = useState('')
   const [doelen, setDoelen] = useState('')
+  const [primaryGoal, setPrimaryGoal] = useState('')
   const [websiteUrl, setWebsiteUrl] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -25,7 +26,7 @@ export default function Onboarding() {
     e.preventDefault()
     setError('')
 
-    if (!branche || !doelen || !websiteUrl) {
+    if (!branche || !doelen || !primaryGoal || !websiteUrl) {
       setError('Vul alle velden in.')
       return
     }
@@ -41,6 +42,7 @@ export default function Onboarding() {
       id: user.id,
       branche,
       doelen,
+      primary_goal: primaryGoal,
       onboarding_completed: true,
     })
 
@@ -87,6 +89,20 @@ export default function Onboarding() {
             value={doelen}
             onChange={(e) => setDoelen(e.target.value)}
           />
+        </div>
+        <div>
+          <label htmlFor="primaryGoal">Primair bedrijfsdoel</label>
+          <select
+            id="primaryGoal"
+            value={primaryGoal}
+            onChange={(e) => setPrimaryGoal(e.target.value)}
+          >
+            <option value="">Kies een optie</option>
+            <option value="awareness">Meer bekendheid / naamsbekendheid</option>
+            <option value="leads">Meer aanvragen / leads</option>
+            <option value="sales">Directe verkoop / omzet</option>
+            <option value="retention">Bestaande klanten behouden / meer herhaalaankopen</option>
+          </select>
         </div>
         <div>
           <label htmlFor="websiteUrl">Website-URL</label>

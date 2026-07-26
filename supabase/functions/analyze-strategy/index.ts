@@ -9,7 +9,11 @@ const corsHeaders = {
 
 const ANTHROPIC_MODEL_MAIN = "claude-sonnet-5"
 const ANTHROPIC_MODEL_QC = "claude-haiku-4-5-20251001"
-const ANTHROPIC_TIMEOUT_MS = 60_000
+const QC_TIMEOUT_MS = 30_000
+// Hoofdgeneratie streamt: dit is een idle-timeout (reset bij elk ontvangen chunk),
+// geen totale-duur-cap. Een actief streamende call mag langer duren dan dit getal;
+// alleen als er 90s niets binnenkomt, wordt de call afgebroken.
+const MAIN_IDLE_TIMEOUT_MS = 90_000
 const MAIN_MAX_TOKENS = 8192
 const QC_MAX_TOKENS = 1024
 const MAX_ATTEMPTS = 3
@@ -104,9 +108,8 @@ interface CompanyAnalysisRow {
 }
 
 interface ProfileRow {
-  business_name: string | null
-  industry: string | null
-  goals: string | null
+  branche: string | null
+  doelen: string | null
   primary_goal: string | null
 }
 
@@ -131,14 +134,20 @@ function stripMarkdownFence(text: string): string {
   return fenceMatch ? fenceMatch[1].trim() : trimmed
 }
 
+// Niet-streamend: gebruikt voor de QC-call. Die output is klein (QC_MAX_TOKENS),
+// dus in één keer wachten op het volledige antwoord is hier geen probleem.
 async function callClaude(
   system: string,
   userMessage: string,
   model: string,
   maxTokens: number,
+  label: string,
 ): Promise<string> {
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), ANTHROPIC_TIMEOUT_MS)
+  const timeoutId = setTimeout(() => controller.abort(), QC_TIMEOUT_MS)
+  const start = Date.now()
+
+  console.log(`[analyze-strategy] ${label}: fetch naar Anthropic API gestart (model=${model})`)
 
   let res: Response
   try {
@@ -158,17 +167,142 @@ async function callClaude(
       signal: controller.signal,
     })
   } catch (err) {
-    throw new Error(`netwerkfout of timeout bij Anthropic API (${String(err)})`)
+    const elapsedMs = Date.now() - start
+    const isTimeout = err instanceof DOMException && err.name === "AbortError"
+    console.log(
+      `[analyze-strategy] ${label}: fetch mislukt na ${elapsedMs}ms (${isTimeout ? "timeout" : "netwerkfout"})`,
+    )
+    if (isTimeout) {
+      throw new Error(`${label}: timeout na ${QC_TIMEOUT_MS}ms zonder antwoord van Anthropic API`)
+    }
+    throw new Error(`${label}: netwerkfout bij Anthropic API (${String(err)})`)
   } finally {
     clearTimeout(timeoutId)
   }
 
+  const elapsedMs = Date.now() - start
+  console.log(`[analyze-strategy] ${label}: fetch klaar in ${elapsedMs}ms (status ${res.status})`)
+
   if (!res.ok) {
-    throw new Error(`Anthropic API gaf een foutstatus terug (${res.status})`)
+    throw new Error(`${label}: Anthropic API gaf een foutstatus terug (${res.status})`)
   }
 
   const data = await res.json()
   return data?.content?.[0]?.text ?? ""
+}
+
+// Streamend: gebruikt voor de hoofdgeneratie. De output (volledige maandkalender)
+// is te groot om betrouwbaar binnen één vaste timeout te wachten, dus we lezen de
+// server-sent events en bouwen de tekst op uit content_block_delta-events. De
+// idle-timer wordt bij elk ontvangen chunk gereset: een actief streamende call
+// loopt door, maar een call die MAIN_IDLE_TIMEOUT_MS lang niets stuurt, wordt
+// alsnog afgebroken.
+async function callClaudeStreaming(
+  system: string,
+  userMessage: string,
+  model: string,
+  maxTokens: number,
+  label: string,
+): Promise<string> {
+  const controller = new AbortController()
+  let idleTimeoutId = setTimeout(() => controller.abort(), MAIN_IDLE_TIMEOUT_MS)
+  const resetIdleTimer = () => {
+    clearTimeout(idleTimeoutId)
+    idleTimeoutId = setTimeout(() => controller.abort(), MAIN_IDLE_TIMEOUT_MS)
+  }
+  const start = Date.now()
+
+  console.log(`[analyze-strategy] ${label}: fetch naar Anthropic API gestart (model=${model}, stream=true)`)
+
+  let res: Response
+  try {
+    res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": Deno.env.get("ANTHROPIC_API_KEY")!,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system,
+        stream: true,
+        messages: [{ role: "user", content: userMessage }],
+      }),
+      signal: controller.signal,
+    })
+  } catch (err) {
+    clearTimeout(idleTimeoutId)
+    const elapsedMs = Date.now() - start
+    const isTimeout = err instanceof DOMException && err.name === "AbortError"
+    console.log(
+      `[analyze-strategy] ${label}: fetch mislukt na ${elapsedMs}ms (${isTimeout ? "timeout, geen activiteit" : "netwerkfout"})`,
+    )
+    if (isTimeout) {
+      throw new Error(`${label}: timeout na ${MAIN_IDLE_TIMEOUT_MS}ms zonder activiteit van Anthropic API`)
+    }
+    throw new Error(`${label}: netwerkfout bij Anthropic API (${String(err)})`)
+  }
+
+  if (!res.ok || !res.body) {
+    clearTimeout(idleTimeoutId)
+    const elapsedMs = Date.now() - start
+    console.log(`[analyze-strategy] ${label}: fetch mislukt na ${elapsedMs}ms (status ${res.status})`)
+    throw new Error(`${label}: Anthropic API gaf een foutstatus terug (${res.status})`)
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+  let fullText = ""
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      resetIdleTimer()
+      buffer += decoder.decode(value, { stream: true })
+
+      const lines = buffer.split("\n")
+      buffer = lines.pop() ?? ""
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue
+        const data = line.slice("data: ".length).trim()
+        if (data === "" || data === "[DONE]") continue
+
+        let event: { type?: string; delta?: { type?: string; text?: string } }
+        try {
+          event = JSON.parse(data)
+        } catch {
+          continue
+        }
+
+        if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
+          fullText += event.delta.text ?? ""
+        }
+      }
+    }
+  } catch (err) {
+    const elapsedMs = Date.now() - start
+    const isTimeout = err instanceof DOMException && err.name === "AbortError"
+    console.log(
+      `[analyze-strategy] ${label}: stream afgebroken na ${elapsedMs}ms (${isTimeout ? "timeout, geen activiteit" : "leesfout"})`,
+    )
+    if (isTimeout) {
+      throw new Error(`${label}: timeout na ${MAIN_IDLE_TIMEOUT_MS}ms zonder nieuwe data van Anthropic API`)
+    }
+    throw new Error(`${label}: fout bij het lezen van de stream (${String(err)})`)
+  } finally {
+    clearTimeout(idleTimeoutId)
+  }
+
+  const elapsedMs = Date.now() - start
+  console.log(`[analyze-strategy] ${label}: stream klaar in ${elapsedMs}ms (${fullText.length} tekens ontvangen)`)
+
+  return fullText
 }
 
 function buildStrategyUserMessage(params: {
@@ -326,12 +460,16 @@ Deno.serve(async (req) => {
     }
 
     // Stap 2: laatste bedrijfsanalyse voor dit kanaal ophalen (hoogste versie)
+    console.log(`[analyze-strategy] Stap 2: company_analyses ophalen voor channel_id=${channel_id}`)
     const { data: analysisRows, error: analysisError } = await supabaseAdmin
       .from("company_analyses")
       .select("id, summary_json, versie, status")
       .eq("channel_id", channel_id)
       .order("versie", { ascending: false })
       .limit(1)
+    console.log(
+      `[analyze-strategy] Stap 2: company_analyses opgehaald (${analysisRows?.length ?? 0} rij(en), fout: ${analysisError ? analysisError.message : "geen"})`,
+    )
 
     if (analysisError) {
       return jsonResponse({ error: "Kon bedrijfsanalyse niet ophalen." }, 500)
@@ -351,19 +489,22 @@ Deno.serve(async (req) => {
     }
 
     // Stap 3: onboarding-voorkeuren van de gebruiker
+    console.log(`[analyze-strategy] Stap 3: profiles ophalen voor user_id=${user.id}`)
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
-      .select("business_name, industry, goals, primary_goal")
+      .select("branche, doelen, primary_goal")
       .eq("id", user.id)
       .maybeSingle<ProfileRow>()
+    console.log(
+      `[analyze-strategy] Stap 3: profiles opgehaald (gevonden: ${profile ? "ja" : "nee"}, fout: ${profileError ? profileError.message : "geen"})`,
+    )
 
     if (profileError) {
       return jsonResponse({ error: "Kon gebruikersprofiel niet ophalen." }, 500)
     }
     const profileContext: ProfileRow = profile ?? {
-      business_name: null,
-      industry: null,
-      goals: null,
+      branche: null,
+      doelen: null,
       primary_goal: null,
     }
 
@@ -438,6 +579,8 @@ Deno.serve(async (req) => {
     let retryNote: string | undefined = undefined
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      console.log(`[analyze-strategy] Poging ${attempt}/${MAX_ATTEMPTS} gestart`)
+
       const userMessage = buildStrategyUserMessage({
         companyAnalysisSummary: latestAnalysis.summary_json,
         profile: profileContext,
@@ -448,9 +591,16 @@ Deno.serve(async (req) => {
 
       let rawText: string
       try {
-        rawText = await callClaude(STRATEGY_SYSTEM_PROMPT, userMessage, ANTHROPIC_MODEL_MAIN, MAIN_MAX_TOKENS)
+        rawText = await callClaudeStreaming(
+          STRATEGY_SYSTEM_PROMPT,
+          userMessage,
+          ANTHROPIC_MODEL_MAIN,
+          MAIN_MAX_TOKENS,
+          `poging ${attempt}: hoofdgeneratie`,
+        )
       } catch (err) {
         lastFailureReason = String(err instanceof Error ? err.message : err)
+        console.log(`[analyze-strategy] Poging ${attempt}: hoofdgeneratie-call mislukt: ${lastFailureReason}`)
         retryNote = lastFailureReason
         continue
       }
@@ -458,7 +608,9 @@ Deno.serve(async (req) => {
       let plan: StrategyPlan
       try {
         plan = JSON.parse(stripMarkdownFence(rawText))
+        console.log(`[analyze-strategy] Poging ${attempt}: JSON-parse hoofdgeneratie gelukt`)
       } catch {
+        console.log(`[analyze-strategy] Poging ${attempt}: JSON-parse hoofdgeneratie mislukt`)
         lastFailureReason = "Het antwoord van de AI was geen geldige JSON."
         retryNote = lastFailureReason
         continue
@@ -466,32 +618,47 @@ Deno.serve(async (req) => {
 
       const validationError = validatePlan(plan)
       if (validationError) {
+        console.log(`[analyze-strategy] Poging ${attempt}: code-validatie mislukt: ${validationError}`)
         lastFailureReason = validationError
         retryNote = validationError
         continue
       }
 
-      let qc: QcJudgement
+      let qcRawText: string
       try {
-        const qcRawText = await callClaude(
+        qcRawText = await callClaude(
           QC_SYSTEM_PROMPT,
           buildQcUserMessage(latestAnalysis.summary_json, plan),
           ANTHROPIC_MODEL_QC,
           QC_MAX_TOKENS,
+          `poging ${attempt}: QC-controle`,
         )
-        qc = JSON.parse(stripMarkdownFence(qcRawText))
       } catch (err) {
         lastFailureReason = `QC-controle mislukt: ${String(err instanceof Error ? err.message : err)}`
+        console.log(`[analyze-strategy] Poging ${attempt}: QC-call mislukt: ${lastFailureReason}`)
+        retryNote = lastFailureReason
+        continue
+      }
+
+      let qc: QcJudgement
+      try {
+        qc = JSON.parse(stripMarkdownFence(qcRawText))
+        console.log(`[analyze-strategy] Poging ${attempt}: JSON-parse QC-oordeel gelukt (akkoord=${qc.akkoord})`)
+      } catch {
+        console.log(`[analyze-strategy] Poging ${attempt}: JSON-parse QC-oordeel mislukt`)
+        lastFailureReason = "Het antwoord van de QC-controle was geen geldige JSON."
         retryNote = lastFailureReason
         continue
       }
 
       if (!qc.akkoord) {
         lastFailureReason = qc.reden || "QC-controle keurde het plan af zonder reden."
+        console.log(`[analyze-strategy] Poging ${attempt}: QC-controle keurde het plan af: ${lastFailureReason}`)
         retryNote = lastFailureReason
         continue
       }
 
+      console.log(`[analyze-strategy] Poging ${attempt}: geslaagd, plan goedgekeurd`)
       approvedPlan = plan
       break
     }

@@ -4,6 +4,8 @@ import { supabase } from '../../supabaseClient'
 import { useAuth } from '../../context/useAuth'
 
 const ANALYSIS_ERROR_MESSAGE = 'Analyse mislukt, probeer opnieuw.'
+const STRATEGY_GENERATION_ERROR_MESSAGE = 'Genereren mislukt, probeer opnieuw.'
+const APPROVE_ERROR_MESSAGE = 'Goedkeuren mislukt, probeer opnieuw.'
 const NOT_INFERRABLE = 'Niet af te leiden uit de website'
 
 const cardStyle = {
@@ -11,6 +13,20 @@ const cardStyle = {
   border: '1px solid var(--border)',
   borderRadius: '4px',
   padding: '24px',
+}
+
+const calendarItemStyle = {
+  textAlign: 'left',
+  border: '1px solid var(--border)',
+  borderRadius: '4px',
+  padding: '16px',
+  marginBottom: '12px',
+}
+
+const approvalBarStyle = {
+  marginTop: '16px',
+  paddingTop: '16px',
+  borderTop: '1px solid var(--border)',
 }
 
 function isConfidenceField(field) {
@@ -161,16 +177,69 @@ function KlantproblemenBlock({ field }) {
   )
 }
 
+function capitalize(text) {
+  if (typeof text !== 'string' || text === '') return text
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+function StrategyStatusLabel({ status }) {
+  if (status !== 'goedgekeurd') return null
+
+  return (
+    <span
+      style={{
+        marginLeft: '8px',
+        fontSize: '0.75em',
+        color: 'var(--accent)',
+        border: '1px solid var(--accent-border)',
+        borderRadius: '3px',
+        padding: '2px 8px',
+        background: 'var(--accent-bg)',
+      }}
+    >
+      Goedgekeurd
+    </span>
+  )
+}
+
+function CalendarItemCard({ item }) {
+  return (
+    <div style={calendarItemStyle}>
+      <p style={{ fontWeight: 600 }}>{item.topic}</p>
+      <p style={{ fontSize: '0.85em', color: 'var(--text)' }}>
+        {item.content_pillar} · {capitalize(item.funnel_stage)} · {capitalize(item.format)} · Prioriteit{' '}
+        {item.priority}
+      </p>
+      {item.angle && <p>{item.angle}</p>}
+      {item.cta_goal && (
+        <p style={{ fontSize: '0.85em', color: 'var(--text)' }}>CTA: {item.cta_goal}</p>
+      )}
+    </div>
+  )
+}
+
 export default function Strategie() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [websiteChannel, setWebsiteChannel] = useState(null)
   const [analysisRecord, setAnalysisRecord] = useState(null)
+  const [strategyVersion, setStrategyVersion] = useState(null)
 
   // Status of the "Opnieuw analyseren" action, separate from the status
   // already stored on the loaded analysisRecord itself.
   const [analysisStatus, setAnalysisStatus] = useState('idle')
   const [analysisError, setAnalysisError] = useState('')
+
+  const [generateStatus, setGenerateStatus] = useState('idle')
+  const [generateError, setGenerateError] = useState('')
+
+  const [approveStatus, setApproveStatus] = useState('idle')
+  const [approveError, setApproveError] = useState('')
+
+  const [showReviseForm, setShowReviseForm] = useState(false)
+  const [feedbackText, setFeedbackText] = useState('')
+  const [reviseStatus, setReviseStatus] = useState('idle')
+  const [reviseError, setReviseError] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -201,6 +270,17 @@ export default function Strategie() {
         if (cancelled) return
         setAnalysisRecord(latestAnalysis)
       }
+
+      const { data: latestStrategy } = await supabase
+        .from('strategy_versions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('version', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (cancelled) return
+      setStrategyVersion(latestStrategy)
 
       setLoading(false)
     }
@@ -262,6 +342,111 @@ export default function Strategie() {
       month: 'long',
       year: 'numeric',
     })
+  }
+
+  // Gedeeld door "Genereer strategie" en "Aanpassen": analyze-strategy geeft
+  // alleen { id } terug, dus na een geslaagde call halen we de nieuwe rij zelf op.
+  async function callAnalyzeStrategy(body) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-strategy`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify(body),
+      }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok || data.error) {
+      throw new Error(data.error || STRATEGY_GENERATION_ERROR_MESSAGE)
+    }
+
+    const { data: newStrategy, error: fetchError } = await supabase
+      .from('strategy_versions')
+      .select('*')
+      .eq('id', data.id)
+      .single()
+
+    if (fetchError || !newStrategy) {
+      throw new Error(STRATEGY_GENERATION_ERROR_MESSAGE)
+    }
+
+    return newStrategy
+  }
+
+  async function handleGenerateStrategy() {
+    if (!websiteChannel) return
+
+    setGenerateStatus('generating')
+    setGenerateError('')
+
+    try {
+      const newStrategy = await callAnalyzeStrategy({ channel_id: websiteChannel.id })
+      setStrategyVersion(newStrategy)
+      setGenerateStatus('idle')
+    } catch (err) {
+      setGenerateStatus('error')
+      setGenerateError(err.message || STRATEGY_GENERATION_ERROR_MESSAGE)
+    }
+  }
+
+  async function handleApproveStrategy() {
+    if (!strategyVersion) return
+
+    setApproveStatus('approving')
+    setApproveError('')
+
+    try {
+      const { data: updated, error: updateError } = await supabase
+        .from('strategy_versions')
+        .update({ status: 'goedgekeurd' })
+        .eq('id', strategyVersion.id)
+        .select()
+        .single()
+
+      if (updateError || !updated) {
+        setApproveStatus('error')
+        setApproveError(APPROVE_ERROR_MESSAGE)
+        return
+      }
+
+      setStrategyVersion(updated)
+      setApproveStatus('success')
+    } catch {
+      setApproveStatus('error')
+      setApproveError(APPROVE_ERROR_MESSAGE)
+    }
+  }
+
+  async function handleSubmitFeedback(event) {
+    event.preventDefault()
+    if (!websiteChannel || !strategyVersion || feedbackText.trim() === '') return
+
+    setReviseStatus('submitting')
+    setReviseError('')
+
+    try {
+      const newStrategy = await callAnalyzeStrategy({
+        channel_id: websiteChannel.id,
+        previous_strategy_version_id: strategyVersion.id,
+        feedback_text: feedbackText.trim(),
+      })
+      setStrategyVersion(newStrategy)
+      setReviseStatus('idle')
+      setShowReviseForm(false)
+      setFeedbackText('')
+    } catch (err) {
+      setReviseStatus('error')
+      setReviseError(err.message || STRATEGY_GENERATION_ERROR_MESSAGE)
+    }
   }
 
   const reanalyzeButton = (
@@ -353,10 +538,120 @@ export default function Strategie() {
     )
   }
 
+  function renderStrategySection() {
+    if (loading || !websiteChannel || !analysisRecord || analysisRecord.status === 'mislukt') {
+      return null
+    }
+
+    if (!strategyVersion) {
+      return (
+        <div style={cardStyle}>
+          <p>Nog geen contentstrategie gegenereerd voor deze bedrijfsanalyse.</p>
+          <button
+            type="button"
+            onClick={handleGenerateStrategy}
+            disabled={generateStatus === 'generating'}
+          >
+            {generateStatus === 'generating'
+              ? 'Bezig met genereren... (dit kan 10-30 seconden duren)'
+              : 'Genereer strategie'}
+          </button>
+          {generateStatus === 'error' && <p>{generateError}</p>}
+        </div>
+      )
+    }
+
+    const plan = strategyVersion.plan_json ?? {}
+    const calendarItems = Array.isArray(plan.calendar_items) ? plan.calendar_items : []
+    const isPendingApproval = strategyVersion.status === 'wacht_op_goedkeuring'
+
+    return (
+      <div style={cardStyle}>
+        <p>
+          Versie {strategyVersion.version}, {formatDate(strategyVersion.created_at)}
+          <StrategyStatusLabel status={strategyVersion.status} />
+        </p>
+
+        {plan.strategic_understanding && (
+          <>
+            <h2>Strategisch inzicht</h2>
+            <p>{plan.strategic_understanding}</p>
+          </>
+        )}
+
+        {plan.framework && (
+          <>
+            <h2>Aanpak</h2>
+            <p>{plan.framework}</p>
+          </>
+        )}
+
+        <h2>Contentkalender</h2>
+        {calendarItems.length === 0 ? (
+          <p>Geen contentitems beschikbaar.</p>
+        ) : (
+          calendarItems.map((item, index) => (
+            <CalendarItemCard key={`${item.topic}-${index}`} item={item} />
+          ))
+        )}
+
+        {isPendingApproval && (
+          <div style={approvalBarStyle}>
+            <p>Deze strategie wacht op je goedkeuring.</p>
+            <button
+              type="button"
+              onClick={handleApproveStrategy}
+              disabled={approveStatus === 'approving'}
+            >
+              {approveStatus === 'approving' ? 'Bezig...' : 'Goedkeuren'}
+            </button>{' '}
+            <button type="button" onClick={() => setShowReviseForm((prev) => !prev)}>
+              Aanpassen
+            </button>
+            {approveStatus === 'error' && <p>{approveError}</p>}
+            {approveStatus === 'success' && <p>Strategie goedgekeurd.</p>}
+
+            {showReviseForm && (
+              <form onSubmit={handleSubmitFeedback} style={{ marginTop: '16px' }}>
+                <label htmlFor="feedback_text">Wat moet er worden aangepast?</label>
+                <br />
+                <textarea
+                  id="feedback_text"
+                  value={feedbackText}
+                  onChange={(event) => setFeedbackText(event.target.value)}
+                  rows={4}
+                  style={{ width: '100%', marginTop: '8px' }}
+                />
+                <br />
+                <button
+                  type="submit"
+                  disabled={reviseStatus === 'submitting' || feedbackText.trim() === ''}
+                >
+                  {reviseStatus === 'submitting'
+                    ? 'Bezig met aanpassen... (dit kan 10-30 seconden duren)'
+                    : 'Verstuur en genereer nieuwe versie'}
+                </button>
+                {reviseStatus === 'error' && <p>{reviseError}</p>}
+              </form>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const strategySection = renderStrategySection()
+
   return (
     <div>
       <h1>Strategie</h1>
       {renderContent()}
+      {strategySection && (
+        <>
+          <h2>Contentplan</h2>
+          {strategySection}
+        </>
+      )}
     </div>
   )
 }

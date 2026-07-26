@@ -41,7 +41,14 @@ Fase 2 is afgerond: Website Analysis Agent volledig gebouwd en getest — backen
 Kanalen.jsx (website koppelen, analyse starten/herstarten, statusweergave) én de
 bedrijfsanalyse-kaart met "opnieuw analyseren" op Strategie.jsx.
 
-Volgende stap: Fase 3 — Content Strategy, Copywriting & Image Agent
+Fase 3 is gedeeltelijk afgerond: Content Strategy Agent volledig gebouwd en getest —
+database-tabel strategy_versions, analyze-strategy Edge Function (hybride AI+QC-generatie
+met retry-loop en streaming) en de Strategie-pagina (contentplan tonen, genereren,
+goedkeuren, aanpassen met feedback). Copywriting Agent en Image Generation Agent staan
+nog open binnen Fase 3 — nog niet gestart.
+
+Eerstvolgende openstaande taak (start van Fase 4): het "exploderen" van een goedgekeurde
+strategy_versions-rij naar losse posts-rijen — dit is nog niet ontworpen of gebouwd.
 (zie docs/technische-blauwdruk.md, docs/stappenplan.md stap 4 voor de volledige,
 vaste inhoud van elke stap — status van elke stap staat alleen hier).
 

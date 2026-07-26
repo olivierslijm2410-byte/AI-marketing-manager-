@@ -20,23 +20,31 @@ Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
   status bezig/geanalyseerd/mislukt tonen, inclusief na page refresh), en de
   bedrijfsanalyse-kaart met opnieuw-analyseren op Strategie.jsx.
 
-### 2. Content Strategy Agent 🔴
+### 2. Content Strategy Agent 🟢
 - Doel: concreet contentplan maken
 - Input: output van Website Analysis Agent
 - Output: contentkalender met onderwerpen + planning
 - Afhankelijk van: Website Analysis Agent
+- Volledig afgerond: database-tabel strategy_versions, analyze-strategy Edge Function
+  (hybride AI+QC-generatie met retry-loop, streaming voor de hoofdgeneratie om
+  timeouts te voorkomen) en de Strategie-pagina (contentplan tonen, genereren,
+  goedkeuren, aanpassen met feedback) — alle drie klaar en getest.
 
 ### 3. Copywriting Agent 🔴
 - Doel: teksten/captions schrijven per contentstuk
 - Input: één item uit het contentplan
 - Output: kant-en-klare tekst
 - Afhankelijk van: Content Strategy Agent
+- Nog niet gestart. Content Strategy Agent is afgerond, dus deze kan nu starten
+  zodra het "exploderen" van een goedgekeurde strategie naar posts-rijen er is
+  (zie CLAUDE.md, eerstvolgende openstaande taak).
 
 ### 4. Image Generation Agent 🔴
 - Doel: bijpassende afbeelding maken
 - Input: onderwerp/tekst van de post
 - Output: gegenereerde afbeelding
 - Afhankelijk van: Content Strategy Agent
+- Nog niet gestart. Zelfde afhankelijkheid als Copywriting Agent hierboven.
 
 ## Fase 4-6 (later — pas na werkende MVP)
 

@@ -6,10 +6,10 @@ Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
 - Instagram OAuth-koppeling 🟢 — authorize-flow, callback edge function
   (token-uitwisseling), opslag in channels-tabel. Werkt end-to-end.
 - Anthropic API-billing 🟢 — geactiveerd, agents kunnen nu daadwerkelijk AI-calls uitvoeren
-- Strategie goedkeuren → posts exploderen 🟢 klaar & getest (nog geen frontend-trigger) —
+- Strategie goedkeuren → posts exploderen 🟢 klaar & getest, inclusief frontend-trigger —
   approve-strategy Edge Function zet een goedgekeurde strategy_versions-rij om in losse
-  posts-rijen (status 'concept'). Backend werkt en is getest, maar de Strategie-pagina
-  roept 'm nog niet aan.
+  posts-rijen (status 'concept'). Wordt aangeroepen via de goedkeur-knop op de
+  Strategie-pagina, end-to-end getest in de browser.
 
 ## Fase 2-3 (MVP — bouwen we eerst)
 
@@ -43,7 +43,8 @@ Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
   gebaseerd op de bedrijfsanalyse (tone_of_voice, positionering, merkpersoonlijkheid,
   kernboodschappen, klantproblemen_motivaties, doelgroep) en het contentplan-item,
   met rule-based lengte-/taalcontrole en een inkort-retry bij een te lange caption.
-  Backend klaar en getest, nog geen frontend-trigger.
+  Inclusief frontend-trigger via de Contentkalender-pagina (caption genereren,
+  goedkeuren, afwijzen met gerichte herschrijving) — end-to-end getest in de browser.
 
 ### 4. Image Generation Agent 🔴
 - Doel: bijpassende afbeelding maken

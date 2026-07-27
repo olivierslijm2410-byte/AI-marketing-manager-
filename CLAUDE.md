@@ -42,22 +42,20 @@ Kanalen.jsx (website koppelen, analyse starten/herstarten, statusweergave) én d
 bedrijfsanalyse-kaart met "opnieuw analyseren" op Strategie.jsx.
 
 Fase 3 MVP-keten (Website Analysis → Content Strategy → Copywriting) is nu volledig
-werkend en getest:
+werkend, getest en end-to-end doorlopen in de browser:
 - Content Strategy Agent: database-tabel strategy_versions, analyze-strategy Edge
   Function (hybride AI+QC-generatie met retry-loop en streaming) en de Strategie-pagina
   (contentplan tonen, genereren, goedkeuren, aanpassen met feedback).
 - Het "exploderen" van een goedgekeurde strategy_versions-rij naar losse posts-rijen:
-  approve-strategy Edge Function (posts.rejection_reason erbij voor afwijzingen).
+  approve-strategy Edge Function (posts.rejection_reason erbij voor afwijzingen),
+  aangeroepen via de goedkeur-knop op de Strategie-pagina.
 - Copywriting Agent: generate-copy Edge Function — caption + hashtags per post op basis
   van de bedrijfsanalyse en het contentplan-item, met rule-based lengte-/taalcontrole en
   een inkort-retry. Getest op alle drie funnel-fases (awareness, consideration,
-  conversion).
+  conversion). Gekoppeld aan de Contentkalender-pagina (posts tonen, caption genereren,
+  goedkeuren, afwijzen met gerichte herschrijving).
 
-approve-strategy en generate-copy zijn backend-only: geen van beide is nog gekoppeld aan
-de frontend (de Strategie-pagina roept approve-strategy nog niet aan bij goedkeuren, en
-er is nog geen scherm dat generate-copy aanroept).
-
-Eerstvolgende openstaande taak: Image Generation Agent — de laatste agent van Fase 3.
+Enige overgebleven agent voor Fase 3: Image Generation Agent (nog te bouwen).
 (zie docs/technische-blauwdruk.md, docs/stappenplan.md stap 4 voor de volledige,
 vaste inhoud van elke stap — status van elke stap staat alleen hier).
 

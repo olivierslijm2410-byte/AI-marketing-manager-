@@ -22,7 +22,7 @@ Schrijfinstructies:
 - De hook (openingszin) sluit aan bij de meegegeven hook_direction.
 - De kern van de caption sluit aan bij de funnel_stage: bij "awareness" maak je nieuwsgierig, bij "consideration" maak je de voordelen concreet, bij "conversion" geef je een duidelijke reden om nu actie te ondernemen.
 - De call-to-action sluit aan bij de meegegeven cta_goal.
-- Je schrijft consistent in de merk-tone-of-voice.
+- Je schrijft consistent in de merk-tone-of-voice, inclusief de aanspreekvorm: bepaal op basis van tone_of_voice of het merk "je/jouw" (informeel) of "u/uw" (formeel) gebruikt, en houd die keuze de hele caption vol — wissel nooit binnen één caption tussen beide vormen.
 - Je doet nooit medische of financiële claims (bijvoorbeeld genezing, gegarandeerd resultaat, beleggingsrendement).
 - De caption is maximaal 2200 tekens.
 - Hashtags lever je apart aan als één string: 5 tot 10 relevante hashtags, gescheiden door spaties. Geen generieke spam-hashtags (zoals #love, #instagood, #follow4follow).
@@ -155,7 +155,8 @@ async function callClaude(
   }
 
   const data = await res.json()
-  return data?.content?.[0]?.text ?? ""
+  const textBlock = (data?.content ?? []).find((block: { type?: string; text?: string }) => block.type === "text")
+  return textBlock?.text ?? ""
 }
 
 function buildCopyUserMessage(params: {

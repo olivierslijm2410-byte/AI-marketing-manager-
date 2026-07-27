@@ -34,22 +34,24 @@ Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
   timeouts te voorkomen) en de Strategie-pagina (contentplan tonen, genereren,
   goedkeuren, aanpassen met feedback) — alle drie klaar en getest.
 
-### 3. Copywriting Agent 🔴
+### 3. Copywriting Agent 🟢 klaar & getest (getest op alle drie funnel-fases: awareness, consideration, conversion)
 - Doel: teksten/captions schrijven per contentstuk
 - Input: één item uit het contentplan
 - Output: kant-en-klare tekst
 - Afhankelijk van: Content Strategy Agent
-- Nog niet gestart. Het "exploderen" van een goedgekeurde strategie naar posts-rijen
-  is nu gebouwd (zie approve-strategy onder Infrastructuur hierboven), maar nog niet
-  vanuit de Strategie-pagina aan te roepen. Kan starten zodra die frontend-koppeling
-  er is en er dus posts-rijen ontstaan om te bewerken.
+- Volledig afgerond: generate-copy Edge Function — caption + hashtags per post,
+  gebaseerd op de bedrijfsanalyse (tone_of_voice, positionering, merkpersoonlijkheid,
+  kernboodschappen, klantproblemen_motivaties, doelgroep) en het contentplan-item,
+  met rule-based lengte-/taalcontrole en een inkort-retry bij een te lange caption.
+  Backend klaar en getest, nog geen frontend-trigger.
 
 ### 4. Image Generation Agent 🔴
 - Doel: bijpassende afbeelding maken
 - Input: onderwerp/tekst van de post
 - Output: gegenereerde afbeelding
 - Afhankelijk van: Content Strategy Agent
-- Nog niet gestart. Zelfde afhankelijkheid als Copywriting Agent hierboven.
+- Nog niet gestart. Content Strategy Agent en Copywriting Agent zijn afgerond, dus
+  deze kan nu starten — laatste agent binnen Fase 3.
 
 ## Fase 4-6 (later — pas na werkende MVP)
 

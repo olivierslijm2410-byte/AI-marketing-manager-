@@ -41,20 +41,23 @@ Fase 2 is afgerond: Website Analysis Agent volledig gebouwd en getest — backen
 Kanalen.jsx (website koppelen, analyse starten/herstarten, statusweergave) én de
 bedrijfsanalyse-kaart met "opnieuw analyseren" op Strategie.jsx.
 
-Fase 3 is gedeeltelijk afgerond: Content Strategy Agent volledig gebouwd en getest —
-database-tabel strategy_versions, analyze-strategy Edge Function (hybride AI+QC-generatie
-met retry-loop en streaming) en de Strategie-pagina (contentplan tonen, genereren,
-goedkeuren, aanpassen met feedback). Copywriting Agent en Image Generation Agent staan
-nog open binnen Fase 3 — nog niet gestart.
+Fase 3 MVP-keten (Website Analysis → Content Strategy → Copywriting) is nu volledig
+werkend en getest:
+- Content Strategy Agent: database-tabel strategy_versions, analyze-strategy Edge
+  Function (hybride AI+QC-generatie met retry-loop en streaming) en de Strategie-pagina
+  (contentplan tonen, genereren, goedkeuren, aanpassen met feedback).
+- Het "exploderen" van een goedgekeurde strategy_versions-rij naar losse posts-rijen:
+  approve-strategy Edge Function (posts.rejection_reason erbij voor afwijzingen).
+- Copywriting Agent: generate-copy Edge Function — caption + hashtags per post op basis
+  van de bedrijfsanalyse en het contentplan-item, met rule-based lengte-/taalcontrole en
+  een inkort-retry. Getest op alle drie funnel-fases (awareness, consideration,
+  conversion).
 
-Het "exploderen" van een goedgekeurde strategy_versions-rij naar losse posts-rijen is
-gebouwd als approve-strategy Edge Function (posts.rejection_reason erbij voor afwijzingen)
-— backend klaar en getest, maar nog niet aangeroepen vanuit de Strategie-pagina (geen
-frontend-trigger).
+approve-strategy en generate-copy zijn backend-only: geen van beide is nog gekoppeld aan
+de frontend (de Strategie-pagina roept approve-strategy nog niet aan bij goedkeuren, en
+er is nog geen scherm dat generate-copy aanroept).
 
-Eerstvolgende openstaande taak: die frontend-koppeling (Strategie-pagina roept
-approve-strategy aan bij goedkeuren van een strategieversie), daarna kunnen Copywriting
-Agent en Image Generation Agent starten (start van Fase 4).
+Eerstvolgende openstaande taak: Image Generation Agent — de laatste agent van Fase 3.
 (zie docs/technische-blauwdruk.md, docs/stappenplan.md stap 4 voor de volledige,
 vaste inhoud van elke stap — status van elke stap staat alleen hier).
 

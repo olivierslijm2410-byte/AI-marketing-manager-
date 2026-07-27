@@ -74,8 +74,9 @@ Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
 Zie technische blauwdruk hoofdstuk 10 en agent-blauwdrukken hoofdstuk 17 voor de volledige
 fasering en samenwerkingsketen tussen agents.
 
-Nu actief: Fase 1 is afgerond (auth, dashboard-skelet, onboarding, Instagram OAuth).
-Volgende stap: Fase 2 — Website Analysis Agent.
+Nu actief: Fase 3 bijna afgerond — Website Analysis, Content Strategy en Copywriting
+Agent zijn klaar en getest. Volgende stap: Image Generation Agent (laatste agent van
+Fase 3).
 
 ## Toekomstige ideeën (nog niet plannen, wel onthouden)
 - Shopify-koppeling: conversies/verkopen uitlezen (Fase 6, voedt Sales Sync Agent)

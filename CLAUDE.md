@@ -47,8 +47,14 @@ met retry-loop en streaming) en de Strategie-pagina (contentplan tonen, generere
 goedkeuren, aanpassen met feedback). Copywriting Agent en Image Generation Agent staan
 nog open binnen Fase 3 — nog niet gestart.
 
-Eerstvolgende openstaande taak (start van Fase 4): het "exploderen" van een goedgekeurde
-strategy_versions-rij naar losse posts-rijen — dit is nog niet ontworpen of gebouwd.
+Het "exploderen" van een goedgekeurde strategy_versions-rij naar losse posts-rijen is
+gebouwd als approve-strategy Edge Function (posts.rejection_reason erbij voor afwijzingen)
+— backend klaar en getest, maar nog niet aangeroepen vanuit de Strategie-pagina (geen
+frontend-trigger).
+
+Eerstvolgende openstaande taak: die frontend-koppeling (Strategie-pagina roept
+approve-strategy aan bij goedkeuren van een strategieversie), daarna kunnen Copywriting
+Agent en Image Generation Agent starten (start van Fase 4).
 (zie docs/technische-blauwdruk.md, docs/stappenplan.md stap 4 voor de volledige,
 vaste inhoud van elke stap — status van elke stap staat alleen hier).
 

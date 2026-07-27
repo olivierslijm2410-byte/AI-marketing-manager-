@@ -405,14 +405,37 @@ export default function Strategie() {
     setApproveError('')
 
     try {
-      const { data: updated, error: updateError } = await supabase
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/approve-strategy`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ strategy_version_id: strategyVersion.id }),
+        }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok || data.error) {
+        setApproveStatus('error')
+        setApproveError(APPROVE_ERROR_MESSAGE)
+        return
+      }
+
+      const { data: updated, error: fetchError } = await supabase
         .from('strategy_versions')
-        .update({ status: 'goedgekeurd' })
+        .select('*')
         .eq('id', strategyVersion.id)
-        .select()
         .single()
 
-      if (updateError || !updated) {
+      if (fetchError || !updated) {
         setApproveStatus('error')
         setApproveError(APPROVE_ERROR_MESSAGE)
         return

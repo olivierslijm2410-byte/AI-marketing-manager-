@@ -53,7 +53,9 @@ werkend, getest en end-to-end doorlopen in de browser:
   van de bedrijfsanalyse en het contentplan-item, met rule-based lengte-/taalcontrole en
   een inkort-retry. Getest op alle drie funnel-fases (awareness, consideration,
   conversion). Gekoppeld aan de Contentkalender-pagina (posts tonen, caption genereren,
-  goedkeuren, afwijzen met gerichte herschrijving).
+  goedkeuren, afwijzen met gerichte herschrijving). Na feedback van ChatGPT verder
+  verfijnd met extra rule-based checks (geen_cta-check, hashtag-validatie, verstevigde
+  confidence-fallback) — zie AGENTS.md voor details.
 
 Enige overgebleven agent voor Fase 3: Image Generation Agent (nog te bouwen).
 (zie docs/technische-blauwdruk.md, docs/stappenplan.md stap 4 voor de volledige,

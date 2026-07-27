@@ -45,6 +45,15 @@ Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
   met rule-based lengte-/taalcontrole en een inkort-retry bij een te lange caption.
   Inclusief frontend-trigger via de Contentkalender-pagina (caption genereren,
   goedkeuren, afwijzen met gerichte herschrijving) — end-to-end getest in de browser.
+- Verder verstevigd na feedback van ChatGPT (live v7, gesynchroniseerd met de repo):
+  verstevigde confidence-fallback in de prompt (bij meerdere tegelijk lage/lege
+  belangrijke velden geen feiten over de klant verzinnen, algemener schrijven vanuit
+  onderwerp + betrouwbare positionering), een geen_cta-validatiecheck (caption moet een
+  vraagteken of een actiewoord uit CTA_ACTION_WORDS bevatten), een validateHashtags-check
+  (elke hashtag moet matchen op `^#[A-Za-zÀ-ÿ0-9_]+$`, dus geen koppeltekens/leestekens/
+  dubbele spaties) en een bijpassende promptinstructie zodat het model zulke hashtags al
+  bij de bron vermijdt. Beide nieuwe checks falen direct (geen retry) — alleen
+  caption_te_lang triggert nog de inkort-retry.
 
 ### 4. Image Generation Agent 🔴
 - Doel: bijpassende afbeelding maken

@@ -13,10 +13,29 @@ const MAX_TOKENS = 1024
 const MAX_CAPTION_LENGTH = 2200
 // Eenvoudige, uitbreidbare lijst — case-insensitive substring-match op de caption.
 const FORBIDDEN_WORDS = ["genezen", "gegarandeerd resultaat", "medisch bewezen"]
+// Signaalwoorden voor een call-to-action — case-insensitive substring-match, zelfde stijl als FORBIDDEN_WORDS.
+const CTA_ACTION_WORDS = [
+  "reageer",
+  "laat weten",
+  "bezoek",
+  "kom langs",
+  "bestel",
+  "shop",
+  "klik",
+  "swipe",
+  "tag",
+  "deel",
+  "proef",
+  "ontdek",
+  "kijk",
+  "bel",
+  "mail",
+  "boek",
+]
 
 const COPY_SYSTEM_PROMPT = `Je bent een ervaren copywriter die social media captions schrijft in de tone of voice van het merk waarvoor je werkt. Je krijgt een bedrijfsanalyse en één specifiek onderdeel uit een goedgekeurd contentplan, en schrijft daar een kant-en-klare caption en bijpassende hashtags voor.
 
-Je gebruikt tone_of_voice, positionering, merkpersoonlijkheid, kernboodschappen, klantproblemen_motivaties en doelgroep uit de bedrijfsanalyse om consistent te schrijven met het merk. Elk van deze velden heeft een confidence-niveau ("hoog", "gemiddeld" of "laag"). Bij confidence "laag", of als een veld leeg of afwezig is, behandel je dat veld niet als een hard feit — val in dat geval terug op klantproblemen_motivaties en positionering, die het meest betrouwbare houvast bieden voor waar de tekst wél op moet aansluiten.
+Je gebruikt tone_of_voice, positionering, merkpersoonlijkheid, kernboodschappen, klantproblemen_motivaties en doelgroep uit de bedrijfsanalyse om consistent te schrijven met het merk. Elk van deze velden heeft een confidence-niveau ("hoog", "gemiddeld" of "laag"). Bij confidence "laag", of als een veld leeg of afwezig is, behandel je dat veld niet als een hard feit — val in dat geval terug op klantproblemen_motivaties en positionering, die het meest betrouwbare houvast bieden voor waar de tekst wél op moet aansluiten. Als meerdere van deze belangrijke velden — doelgroep, klantproblemen_motivaties, merkpersoonlijkheid en positionering — tegelijk confidence "laag" hebben, leeg zijn of ontbreken, verzin je geen doelgroep, klantprobleem of ander feit om dat gat te vullen: schrijf dan algemener, vanuit het onderwerp zelf en de positionering voor zover die wél betrouwbaar is, en voeg nooit specifieke aannames over de klant toe.
 
 Schrijfinstructies:
 - De hook (openingszin) sluit aan bij de meegegeven hook_direction.
@@ -25,7 +44,7 @@ Schrijfinstructies:
 - Je schrijft consistent in de merk-tone-of-voice, inclusief de aanspreekvorm: bepaal op basis van tone_of_voice of het merk "je/jouw" (informeel) of "u/uw" (formeel) gebruikt, en houd die keuze de hele caption vol — wissel nooit binnen één caption tussen beide vormen.
 - Je doet nooit medische of financiële claims (bijvoorbeeld genezing, gegarandeerd resultaat, beleggingsrendement).
 - De caption is maximaal 2200 tekens.
-- Hashtags lever je apart aan als één string: 5 tot 10 relevante hashtags, gescheiden door spaties. Geen generieke spam-hashtags (zoals #love, #instagood, #follow4follow).
+- Hashtags lever je apart aan als één string: 5 tot 10 relevante hashtags, gescheiden door spaties. Elke hashtag bevat alleen letters, cijfers en underscores — geen koppeltekens, spaties of andere leestekens binnen de hashtag zelf (schrijf samengestelde woorden aan elkaar, bijvoorbeeld #ZonderEnummers in plaats van #Zonder-E-nummers). Geen generieke spam-hashtags (zoals #love, #instagood, #follow4follow).
 
 Als het onderwerp te vaag of te weinig concreet is om er een zinvolle, specifieke caption voor te schrijven, schrijf dan geen caption — geef in plaats daarvan een duidelijke, bruikbare reden terug zodat de gebruiker het onderwerp kan aanscherpen.
 
@@ -208,8 +227,28 @@ function buildShortenUserMessage(previousCaption: string, previousHashtags: stri
   ].join("\n")
 }
 
-// Code-side QC: rule-based checks op een al geparste, geldige CopySuccessResult
-function validateCaption(caption: string): ValidationResult {
+// Code-side QC voor het hashtags-veld: alleen geldige hashtag-tokens, gescheiden door enkele spaties.
+function validateHashtags(hashtags: string): ValidationResult {
+  if (typeof hashtags !== "string" || hashtags.trim() === "") {
+    return { valid: false, code: "hashtags_ongeldig", reden: "De hashtags zijn leeg." }
+  }
+
+  const tokens = hashtags.split(" ")
+  const invalidToken = tokens.find((token) => !/^#[A-Za-zÀ-ÿ0-9_]+$/.test(token))
+  if (invalidToken !== undefined) {
+    const reden = invalidToken === ""
+      ? "De hashtags bevatten dubbele spaties of een spatie aan het begin/eind."
+      : `Ongeldige hashtag ("${invalidToken}"): elke hashtag moet beginnen met # en mag alleen letters, cijfers en underscores bevatten, zonder spaties binnen de tag.`
+    return { valid: false, code: "hashtags_ongeldig", reden }
+  }
+
+  return { valid: true }
+}
+
+// Code-side QC: rule-based checks op een al geparste, geldige CopySuccessResult.
+// Volgorde: leeg → verboden taal → geen_cta → hashtags_ongeldig → caption_te_lang.
+// Alleen caption_te_lang triggert de bestaande inkort-retry, dus die staat als laatste.
+function validateCaption(caption: string, hashtags: string): ValidationResult {
   if (typeof caption !== "string" || caption.trim() === "") {
     return { valid: false, code: "caption_leeg", reden: "De gegenereerde caption is leeg." }
   }
@@ -222,6 +261,21 @@ function validateCaption(caption: string): ValidationResult {
       code: "verboden_taal",
       reden: `De caption bevat een niet-toegestane term ("${forbiddenWord}").`,
     }
+  }
+
+  const hasQuestionMark = caption.includes("?")
+  const hasActionWord = CTA_ACTION_WORDS.some((word) => lowerCaption.includes(word))
+  if (!hasQuestionMark && !hasActionWord) {
+    return {
+      valid: false,
+      code: "geen_cta",
+      reden: "De caption bevat geen duidelijke call-to-action.",
+    }
+  }
+
+  const hashtagValidation = validateHashtags(hashtags)
+  if (!hashtagValidation.valid) {
+    return hashtagValidation
   }
 
   if (caption.length > MAX_CAPTION_LENGTH) {
@@ -356,7 +410,7 @@ Deno.serve(async (req) => {
     }
 
     let result: CopySuccessResult = parsed
-    let validation = validateCaption(result.caption)
+    let validation = validateCaption(result.caption, result.hashtags)
 
     if (!validation.valid && validation.code === "caption_te_lang") {
       console.log(`[generate-copy] caption te lang (${result.caption.length} tekens), vervolg-call om in te korten`)
@@ -389,7 +443,7 @@ Deno.serve(async (req) => {
       }
 
       result = shortenParsed
-      validation = validateCaption(result.caption)
+      validation = validateCaption(result.caption, result.hashtags)
     }
 
     if (!validation.valid) {

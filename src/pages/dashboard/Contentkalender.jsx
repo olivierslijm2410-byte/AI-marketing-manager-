@@ -6,6 +6,7 @@ import { useAuth } from '../../context/useAuth'
 const GENERATE_ERROR_MESSAGE = 'Genereren mislukt, probeer opnieuw.'
 const APPROVE_ERROR_MESSAGE = 'Goedkeuren mislukt, probeer opnieuw.'
 const REJECT_ERROR_MESSAGE = 'Afwijzen mislukt, probeer opnieuw.'
+const IMAGE_GENERATE_ERROR_MESSAGE = 'Genereren van afbeelding mislukt, probeer opnieuw.'
 
 const cardStyle = {
   textAlign: 'left',
@@ -28,6 +29,14 @@ const badgeStyle = {
   border: '1px solid var(--border)',
   borderRadius: '3px',
   padding: '2px 8px',
+}
+
+const generatedImageStyle = {
+  display: 'block',
+  maxWidth: '400px',
+  width: '100%',
+  borderRadius: '4px',
+  border: '1px solid var(--border)',
 }
 
 const STATUS_LABELS = {
@@ -61,6 +70,10 @@ export default function Contentkalender() {
 
   const [generateStatus, setGenerateStatus] = useState('idle')
   const [generateError, setGenerateError] = useState('')
+
+  // '' | 'prompt' | 'image' — lokale sub-stap tijdens de generate-afbeelding-flow.
+  // image_status op de post zelf is de bron van waarheid voor de rest van de UI.
+  const [imageStep, setImageStep] = useState('')
 
   const [approveStatus, setApproveStatus] = useState('idle')
   const [approveError, setApproveError] = useState('')
@@ -119,6 +132,7 @@ export default function Contentkalender() {
 
     setGenerateStatus('idle')
     setGenerateError('')
+    setImageStep('')
     setApproveStatus('idle')
     setApproveError('')
     setShowRejectForm(false)
@@ -167,6 +181,87 @@ export default function Contentkalender() {
     } catch {
       setGenerateStatus('error')
       setGenerateError(GENERATE_ERROR_MESSAGE)
+    }
+  }
+
+  async function callGenerateImagePrompt(postId) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image-prompt`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ post_id: postId }),
+      }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok || data.error) {
+      throw new Error(data.reden || data.error || IMAGE_GENERATE_ERROR_MESSAGE)
+    }
+
+    return data
+  }
+
+  async function callGeneratePostImage(postId) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-post-image`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ post_id: postId }),
+      }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok || data.error) {
+      throw new Error(data.reden || data.error || IMAGE_GENERATE_ERROR_MESSAGE)
+    }
+
+    return data
+  }
+
+  // Twee-staps-flow: eerst de Flux-prompt laten opstellen, dan pas de afbeelding
+  // laten genereren. Bij een fout in stap 1 slaan we stap 2 over. Dezelfde functie
+  // dient ook voor "opnieuw genereren"/"opnieuw proberen" — de backend overschrijft
+  // (upsert) op post_id, geen aparte retry-logica nodig.
+  async function handleGenerateImage(postId) {
+    setImageStep('prompt')
+
+    let promptData
+    try {
+      promptData = await callGenerateImagePrompt(postId)
+    } catch (err) {
+      setImageStep('')
+      updatePostInState(postId, { image_status: 'failed', image_error: err.message })
+      return
+    }
+
+    updatePostInState(postId, { image_status: promptData.image_status, image_prompt: promptData.image_prompt })
+    setImageStep('image')
+
+    try {
+      const imageData = await callGeneratePostImage(postId)
+      updatePostInState(postId, { image_status: imageData.image_status, image_url: imageData.image_url })
+    } catch (err) {
+      updatePostInState(postId, { image_status: 'failed', image_error: err.message })
+    } finally {
+      setImageStep('')
     }
   }
 
@@ -230,6 +325,48 @@ export default function Contentkalender() {
       setRejectStatus('error')
       setRejectError(REJECT_ERROR_MESSAGE)
     }
+  }
+
+  function renderImageSection(post) {
+    const isBusy = imageStep !== ''
+    const isGenerating = post.image_status === 'generating' || imageStep === 'prompt'
+
+    let generatingText = 'Bezig met genereren... dit kan tot een minuut duren'
+    if (imageStep === 'prompt') {
+      generatingText = 'Prompt wordt gemaakt...'
+    } else if (imageStep === 'image') {
+      generatingText = 'Afbeelding wordt gegenereerd... dit kan tot een minuut duren'
+    }
+
+    return (
+      <div style={{ marginTop: '12px' }}>
+        <h3>Afbeelding</h3>
+
+        {isGenerating ? (
+          <p>{generatingText}</p>
+        ) : post.image_status === 'completed' && post.image_url ? (
+          <div>
+            <img src={post.image_url} alt={post.topic} style={generatedImageStyle} />
+            <div style={{ marginTop: '12px' }}>
+              <button type="button" onClick={() => handleGenerateImage(post.id)} disabled={isBusy}>
+                Opnieuw genereren
+              </button>
+            </div>
+          </div>
+        ) : post.image_status === 'failed' ? (
+          <div>
+            <p>{post.image_error || IMAGE_GENERATE_ERROR_MESSAGE}</p>
+            <button type="button" onClick={() => handleGenerateImage(post.id)} disabled={isBusy}>
+              Opnieuw proberen
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => handleGenerateImage(post.id)} disabled={isBusy}>
+            Genereer afbeelding
+          </button>
+        )}
+      </div>
+    )
   }
 
   function renderPostDetail(post) {
@@ -329,6 +466,8 @@ export default function Contentkalender() {
             )}
           </div>
         )}
+
+        {renderImageSection(post)}
       </div>
     )
   }

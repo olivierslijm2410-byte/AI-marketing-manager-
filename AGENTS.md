@@ -55,13 +55,21 @@ Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
   bij de bron vermijdt. Beide nieuwe checks falen direct (geen retry) — alleen
   caption_te_lang triggert nog de inkort-retry.
 
-### 4. Image Generation Agent 🔴
+### 4. Image Generation Agent 🟢 klaar & getest (end-to-end)
 - Doel: bijpassende afbeelding maken
 - Input: onderwerp/tekst van de post
 - Output: gegenereerde afbeelding
 - Afhankelijk van: Content Strategy Agent
-- Nog niet gestart. Content Strategy Agent en Copywriting Agent zijn afgerond, dus
-  deze kan nu starten — laatste agent binnen Fase 3.
+- Volledig afgerond: twee Edge Functions — generate-image-prompt (creative brief →
+  Claude → Flux-prompt) en generate-post-image (Flux-prompt → Flux API → Supabase
+  Storage). Provider: Black Forest Labs, model flux-2-pro.
+- Nieuwe tabel: ai_usage (kosten-/gebruikstracking). Image-kant is actief; de koppeling
+  met tekstgeneratie (Copywriting Agent) is nog niet gebouwd.
+- Bekende beperking: geen tijd-gebaseerd vangnet voor het edge-case-scenario van een
+  harde procesdood tijdens generatie (zeldzaam, apart traject indien nodig — vereist
+  pg_cron + een updated_at-kolom).
+- Bekende onduidelijkheid: de eenheid van het image_cost/Flux-API cost-veld is nog niet
+  geverifieerd tegen een concreet euro/dollar-bedrag in het BFL-dashboard.
 
 ## Fase 4-6 (later — pas na werkende MVP)
 
@@ -83,9 +91,9 @@ Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
 Zie technische blauwdruk hoofdstuk 10 en agent-blauwdrukken hoofdstuk 17 voor de volledige
 fasering en samenwerkingsketen tussen agents.
 
-Nu actief: Fase 3 bijna afgerond — Website Analysis, Content Strategy en Copywriting
-Agent zijn klaar en getest. Volgende stap: Image Generation Agent (laatste agent van
-Fase 3).
+Nu actief: Fase 3 (MVP-keten) volledig afgerond — Website Analysis, Content Strategy,
+Copywriting en Image Generation Agent zijn alle vier klaar en end-to-end getest.
+Volgende stap: Fase 4 (Social Media Agent — content daadwerkelijk plaatsen).
 
 ## Toekomstige ideeën (nog niet plannen, wel onthouden)
 - Shopify-koppeling: conversies/verkopen uitlezen (Fase 6, voedt Sales Sync Agent)

@@ -36,12 +36,13 @@ scope- of ontwerpvragen, niet voor dagelijks werk.
 Fase 1 is afgerond: authenticatie, dashboard-skelet, onboardingflow én Instagram OAuth
 (koppelen, token-opslag, callback) werken end-to-end.
 
-Volgende stap: Fase 2 — Website Analysis Agent + opslag bedrijfsgegevens
-(zie docs/technische-blauwdruk.md, docs/stappenplan.md stap 3 voor de volledige,
-vaste inhoud van elke stap — status van elke stap staat alleen hier).
+Fase 2-3 (MVP-keten) is nu volledig afgerond: Content Strategy Agent, Copywriting
+Agent en Image Generation Agent staan alle drie op 🟢 en zijn alle drie end-to-end
+getest (zie AGENTS.md voor de technische details per agent).
 
-Let op: Anthropic API-billing activeren staat nog open — dit is een harde vereiste
-vóórdat de eerste agent daadwerkelijk kan draaien (docs/stappenplan.md stap 2).
+Volgende stap: Fase 4 — Social Media Agent (content daadwerkelijk plaatsen)
+(zie docs/technische-blauwdruk.md, docs/stappenplan.md voor de volledige, vaste
+inhoud van elke stap — status van elke stap staat alleen hier).
 
 ## Bekende afwijkingen van de blauwdrukken
 - `channels`-tabel gebruikt in code: `user_id`, `platform`, `instagram_account_id`,

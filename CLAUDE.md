@@ -36,36 +36,30 @@ scope- of ontwerpvragen, niet voor dagelijks werk.
 Fase 1 is afgerond: authenticatie, dashboard-skelet, onboardingflow én Instagram OAuth
 (koppelen, token-opslag, callback) werken end-to-end.
 
-Fase 2 is afgerond: Website Analysis Agent volledig gebouwd en getest — backend
-(analyze-website Edge Function, opslag in company_analyses), frontend-koppeling op
-Kanalen.jsx (website koppelen, analyse starten/herstarten, statusweergave) én de
-bedrijfsanalyse-kaart met "opnieuw analyseren" op Strategie.jsx.
-
-Fase 3 MVP-keten (Website Analysis → Content Strategy → Copywriting) is nu volledig
-werkend, getest en end-to-end doorlopen in de browser:
-- Content Strategy Agent: database-tabel strategy_versions, analyze-strategy Edge
-  Function (hybride AI+QC-generatie met retry-loop en streaming) en de Strategie-pagina
-  (contentplan tonen, genereren, goedkeuren, aanpassen met feedback).
-- Het "exploderen" van een goedgekeurde strategy_versions-rij naar losse posts-rijen:
-  approve-strategy Edge Function (posts.rejection_reason erbij voor afwijzingen),
-  aangeroepen via de goedkeur-knop op de Strategie-pagina.
-- Copywriting Agent: generate-copy Edge Function — caption + hashtags per post op basis
-  van de bedrijfsanalyse en het contentplan-item, met rule-based lengte-/taalcontrole en
-  een inkort-retry. Getest op alle drie funnel-fases (awareness, consideration,
-  conversion). Gekoppeld aan de Contentkalender-pagina (posts tonen, caption genereren,
-  goedkeuren, afwijzen met gerichte herschrijving). Na feedback van ChatGPT verder
-  verfijnd met extra rule-based checks (geen_cta-check, hashtag-validatie, verstevigde
-  confidence-fallback) — zie AGENTS.md voor details.
-
-Enige overgebleven agent voor Fase 3: Image Generation Agent (nog te bouwen).
-(zie docs/technische-blauwdruk.md, docs/stappenplan.md stap 4 voor de volledige,
+Volgende stap: Fase 2 — Website Analysis Agent + opslag bedrijfsgegevens
+(zie docs/technische-blauwdruk.md, docs/stappenplan.md stap 3 voor de volledige,
 vaste inhoud van elke stap — status van elke stap staat alleen hier).
 
-Anthropic API-billing is geactiveerd (was docs/stappenplan.md stap 2) — agents kunnen
-nu daadwerkelijk AI-calls uitvoeren.
+Let op: Anthropic API-billing activeren staat nog open — dit is een harde vereiste
+vóórdat de eerste agent daadwerkelijk kan draaien (docs/stappenplan.md stap 2).
 
 ## Bekende afwijkingen van de blauwdrukken
 - `channels`-tabel gebruikt in code: `user_id`, `platform`, `instagram_account_id`,
   `access_token`, `token_expires_at`, `connected_at`.
   docs/database-schema.md is hierop al bijgewerkt naar de echte kolommen.
-  
+
+## Tools & integraties — gepland, nog niet geconnect
+Status: 🔴 Nog te doen | 🟢 Klaar
+
+- Sentry (connector, error monitoring) 🔴 — nu te connecten
+- frontend-design (Claude Code plugin) 🔴 — nu te installeren
+- webapp-testing (Anthropic example-skill) 🔴 — nu te installeren
+- postiz (Claude Code plugin) 🔴 — bij Stap 5 / Fase 4 (publiceren)
+- resend (Claude Code plugin) 🔴 — bij Fase 5/6
+- Figma (connector) 🔴 — bij Stap 10 (naam/merk/website)
+- theme-factory (Anthropic example-skill) 🔴 — bij Stap 10
+- brand-guidelines (Anthropic example-skill) 🔴 — bij Stap 10
+- shopify-ai-toolkit (Claude Code plugin) 🔴 — bij Stap 12 / Fase 6 (Shopify)
+
+mcp-builder en skill-creator: los inzetten wanneer nodig, niet fase-gebonden.
+canvas-design: bewust overgeslagen (te artistiek/abstract voor on-brand social content). 

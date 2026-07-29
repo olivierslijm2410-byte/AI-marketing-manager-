@@ -336,6 +336,7 @@ Deno.serve(async (req) => {
       const { error: usageError } = await supabaseAdmin.rpc("increment_image_usage", {
         p_user_id: user.id,
         p_cost: submitData.cost ?? 0,
+        p_cost_unit: "credits",
       })
       if (usageError) {
         console.log(`[generate-post-image] kon ai_usage niet bijwerken (niet-fataal): ${usageError.message}`)

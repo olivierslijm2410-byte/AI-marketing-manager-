@@ -2,6 +2,13 @@
 
 Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
 
+## Principe: scheiding van verantwoordelijkheden
+Alleen de Social Media Agent (Fase 4) mag een publicatiestatus zetten (bv. posts.status naar
+'gepland' of 'geplaatst'). Copywriting Agent en Image Generation Agent genereren uitsluitend
+content en werken uitsluitend hun eigen metadata bij (caption, hashtags, image_url, statussen
+zoals image_status completed/failed) — zij raken nooit een publicatie-gerelateerd veld aan. Dit
+voorkomt vermenging van verantwoordelijkheden zodra Fase 4 begint.
+
 ## Infrastructuur (geen agent, wel vereist voor de agents hieronder)
 - Instagram OAuth-koppeling 🟢 — authorize-flow, callback edge function
   (token-uitwisseling), opslag in channels-tabel. Werkt end-to-end.

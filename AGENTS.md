@@ -65,6 +65,11 @@ Status: 🔴 Nog te bouwen | 🟡 In progress | 🟢 Klaar & getest
   Storage). Provider: Black Forest Labs, model flux-2-pro.
 - Nieuwe tabel: ai_usage (kosten-/gebruikstracking). Image-kant is actief; de koppeling
   met tekstgeneratie (Copywriting Agent) is nog niet gebouwd.
+- Frontend-koppeling toegevoegd op de Contentkalender-pagina: een Afbeelding-sectie naast
+  de captionsectie, met dezelfde twee-staps-flow als de backend (generate-image-prompt →
+  generate-post-image) en statusweergave op basis van image_status (knop "Genereer
+  afbeelding", laadindicator, afbeelding + "Opnieuw genereren", foutmelding + "Opnieuw
+  proberen") — end-to-end getest in de browser.
 - Bekende beperking: geen tijd-gebaseerd vangnet voor het edge-case-scenario van een
   harde procesdood tijdens generatie (zeldzaam, apart traject indien nodig — vereist
   pg_cron + een updated_at-kolom).

@@ -37,10 +37,12 @@ Fase 1 is afgerond: authenticatie, dashboard-skelet, onboardingflow én Instagra
 (koppelen, token-opslag, callback) werken end-to-end.
 
 Fase 2-3 (MVP-keten) is nu volledig afgerond: Content Strategy Agent, Copywriting
-Agent en Image Generation Agent staan alle drie op 🟢 en zijn alle drie end-to-end
-getest (zie AGENTS.md voor de technische details per agent).
+Agent en Image Generation Agent staan alle drie op 🟢 — backend én frontend zijn
+voor alle drie klaar, end-to-end getest zowel via directe API-calls als via de
+browser-UI (Strategie-pagina en Contentkalender-pagina) (zie AGENTS.md voor de
+technische details per agent).
 
-Volgende stap: Fase 4 — Social Media Agent (content daadwerkelijk plaatsen)
+Volgende stap: Fase 4 — Social Media Agent (automatisch publiceren + basisresultaten)
 (zie docs/technische-blauwdruk.md, docs/stappenplan.md voor de volledige, vaste
 inhoud van elke stap — status van elke stap staat alleen hier).
 

@@ -7,6 +7,8 @@ const GENERATE_ERROR_MESSAGE = 'Genereren mislukt, probeer opnieuw.'
 const APPROVE_ERROR_MESSAGE = 'Goedkeuren mislukt, probeer opnieuw.'
 const REJECT_ERROR_MESSAGE = 'Afwijzen mislukt, probeer opnieuw.'
 const IMAGE_GENERATE_ERROR_MESSAGE = 'Genereren van afbeelding mislukt, probeer opnieuw.'
+const SCHEDULE_SUGGEST_ERROR_MESSAGE = 'Kon geen planningsvoorstel ophalen, probeer opnieuw.'
+const SCHEDULE_CONFIRM_ERROR_MESSAGE = 'Bevestigen mislukt, probeer opnieuw.'
 
 const cardStyle = {
   textAlign: 'left',
@@ -44,6 +46,18 @@ const STATUS_LABELS = {
   wacht_op_goedkeuring: 'Wacht op goedkeuring',
   goedgekeurd: 'Goedgekeurd',
   afgewezen: 'Afgewezen',
+  gepland: 'Gepland',
+  geplaatst: 'Geplaatst',
+  mislukt: 'Mislukt',
+}
+
+// Zet een ISO-timestamp om naar de waarde die een <input type="datetime-local"> nodig heeft,
+// in de lokale tijdzone van de browser (voor NL-gebruikers is dat Europe/Amsterdam).
+function toDatetimeLocalValue(isoString) {
+  if (!isoString) return ''
+  const date = new Date(isoString)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 function capitalize(text) {
@@ -82,6 +96,11 @@ export default function Contentkalender() {
   const [rejectReasonInput, setRejectReasonInput] = useState('')
   const [rejectStatus, setRejectStatus] = useState('idle')
   const [rejectError, setRejectError] = useState('')
+
+  // 'idle' | 'suggesting' | 'ready' | 'confirming' | 'error'
+  const [scheduleStatus, setScheduleStatus] = useState('idle')
+  const [scheduleError, setScheduleError] = useState('')
+  const [scheduleInput, setScheduleInput] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -139,7 +158,93 @@ export default function Contentkalender() {
     setRejectReasonInput('')
     setRejectStatus('idle')
     setRejectError('')
+    setScheduleStatus('idle')
+    setScheduleError('')
+    setScheduleInput('')
     setExpandedPostId(postId)
+
+    const post = posts.find((p) => p.id === postId)
+    if (post && (post.status === 'goedgekeurd' || post.status === 'gepland')) {
+      if (post.scheduled_at) {
+        setScheduleInput(toDatetimeLocalValue(post.scheduled_at))
+        setScheduleStatus('ready')
+      } else if (post.status === 'goedgekeurd') {
+        // Nog geen voorstel bekend (bv. na page-reload) — alsnog ophalen.
+        fetchScheduleSuggestion(postId)
+      }
+    }
+  }
+
+  async function fetchScheduleSuggestion(postId) {
+    setScheduleStatus('suggesting')
+    setScheduleError('')
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest-schedule`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ post_id: postId }),
+        }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok || data.error) {
+        throw new Error(SCHEDULE_SUGGEST_ERROR_MESSAGE)
+      }
+
+      updatePostInState(postId, {
+        scheduled_at: data.scheduled_at,
+        schedule_suggestion_reason: data.schedule_suggestion_reason,
+      })
+      setScheduleInput(toDatetimeLocalValue(data.scheduled_at))
+      setScheduleStatus('ready')
+    } catch {
+      setScheduleStatus('error')
+      setScheduleError(SCHEDULE_SUGGEST_ERROR_MESSAGE)
+    }
+  }
+
+  async function handleConfirmSchedule(postId) {
+    if (!scheduleInput) return
+
+    setScheduleStatus('confirming')
+    setScheduleError('')
+
+    try {
+      // scheduleInput komt uit <input type="datetime-local">: lokale tijd zonder tijdzone-info.
+      // new Date(...) interpreteert dit correct als lokale tijd van de browser.
+      const scheduledAtIso = new Date(scheduleInput).toISOString()
+
+      const { data: updated, error } = await supabase
+        .from('posts')
+        .update({ scheduled_at: scheduledAtIso, status: 'gepland' })
+        .eq('id', postId)
+        .select()
+        .single()
+
+      if (error || !updated) {
+        setScheduleStatus('error')
+        setScheduleError(SCHEDULE_CONFIRM_ERROR_MESSAGE)
+        return
+      }
+
+      updatePostInState(postId, updated)
+      setScheduleInput(toDatetimeLocalValue(updated.scheduled_at))
+      setScheduleStatus('ready')
+    } catch {
+      setScheduleStatus('error')
+      setScheduleError(SCHEDULE_CONFIRM_ERROR_MESSAGE)
+    }
   }
 
   // Gedeeld door "Genereer caption" en "Afwijzen": generate-copy geeft de
@@ -285,6 +390,7 @@ export default function Contentkalender() {
 
       updatePostInState(postId, updated)
       setApproveStatus('success')
+      fetchScheduleSuggestion(postId)
     } catch {
       setApproveStatus('error')
       setApproveError(APPROVE_ERROR_MESSAGE)
@@ -468,6 +574,58 @@ export default function Contentkalender() {
         )}
 
         {renderImageSection(post)}
+        {renderScheduleSection(post)}
+      </div>
+    )
+  }
+
+  function renderScheduleSection(post) {
+    if (post.status !== 'goedgekeurd' && post.status !== 'gepland') return null
+
+    return (
+      <div style={{ marginTop: '12px' }}>
+        <h3>Planning</h3>
+
+        {scheduleStatus === 'suggesting' && <p>Voorstel voor tijdstip wordt opgehaald...</p>}
+
+        {scheduleStatus === 'error' && (
+          <div>
+            <p>{scheduleError}</p>
+            <button type="button" onClick={() => fetchScheduleSuggestion(post.id)}>
+              Opnieuw proberen
+            </button>
+          </div>
+        )}
+
+        {(scheduleStatus === 'ready' || scheduleStatus === 'confirming') && (
+          <div>
+            {post.schedule_suggestion_reason && (
+              <p style={{ fontSize: '0.85em', color: 'var(--text)' }}>
+                AI-advies: {post.schedule_suggestion_reason}
+              </p>
+            )}
+            <input
+              type="datetime-local"
+              value={scheduleInput}
+              onChange={(event) => setScheduleInput(event.target.value)}
+              disabled={scheduleStatus === 'confirming'}
+            />
+            <div style={{ marginTop: '8px' }}>
+              <button
+                type="button"
+                onClick={() => handleConfirmSchedule(post.id)}
+                disabled={scheduleStatus === 'confirming' || !scheduleInput}
+              >
+                {scheduleStatus === 'confirming'
+                  ? 'Bezig...'
+                  : post.status === 'gepland'
+                  ? 'Planning bijwerken'
+                  : 'Bevestig planning'}
+              </button>
+            </div>
+            {post.status === 'gepland' && <p>Post staat gepland.</p>}
+          </div>
+        )}
       </div>
     )
   }

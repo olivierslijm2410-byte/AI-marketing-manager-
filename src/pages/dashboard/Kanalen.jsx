@@ -7,7 +7,7 @@ function getInstagramAuthorizeUrl() {
     client_id: import.meta.env.VITE_INSTAGRAM_CLIENT_ID,
     redirect_uri: import.meta.env.VITE_INSTAGRAM_REDIRECT_URI,
     response_type: 'code',
-    scope: 'instagram_business_basic,instagram_business_content_publish',
+    scope: 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_insights',
   })
   return `https://www.instagram.com/oauth/authorize?${params.toString()}`
 }

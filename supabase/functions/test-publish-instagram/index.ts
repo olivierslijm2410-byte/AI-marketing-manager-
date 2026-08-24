@@ -15,7 +15,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 }
 
-const GRAPH_API_VERSION = "v21.0"
+const GRAPH_API_VERSION = "v25.0"
 const GRAPH_BASE = `https://graph.instagram.com/${GRAPH_API_VERSION}`
 const CONTAINER_POLL_INTERVAL_MS = 2000
 const CONTAINER_POLL_MAX_ATTEMPTS = 15 // ~30 seconden, ruim voldoende voor een los beeld

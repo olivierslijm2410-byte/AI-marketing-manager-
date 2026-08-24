@@ -108,20 +108,26 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Deze strategieversie bevat geen contentplan-items." }, 400)
     }
 
-    // Stap 3: channel_id ophalen via company_analyses
-    const { data: companyAnalysis, error: analysisError } = await supabaseAdmin
-      .from("company_analyses")
-      .select("channel_id")
-      .eq("id", strategyVersion.company_analysis_id)
+    // Stap 3: Instagram-kanaal ophalen — posts.channel_id moet verwijzen naar
+    // het kanaal waarop geplaatst wordt (Instagram), niet naar het website-kanaal
+    // dat is geanalyseerd. company_analyses.channel_id is bewust NIET de bron hier.
+    const { data: instagramChannel, error: channelLookupError } = await supabaseAdmin
+      .from("channels")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("platform", "instagram")
       .maybeSingle()
 
-    if (analysisError) {
-      return jsonResponse({ error: "Kon bijbehorend kanaal niet ophalen." }, 500)
+    if (channelLookupError) {
+      return jsonResponse({ error: "Kon Instagram-kanaal niet ophalen." }, 500)
     }
-    if (!companyAnalysis?.channel_id) {
-      return jsonResponse({ error: "Geen kanaal gekoppeld aan de bedrijfsanalyse van deze strategie." }, 400)
+    if (!instagramChannel?.id) {
+      return jsonResponse(
+        { error: "geen_instagram_kanaal", reden: "Koppel eerst Instagram via de Kanalen-pagina voordat je een strategie goedkeurt." },
+        400,
+      )
     }
-    const channelId = companyAnalysis.channel_id as string
+    const channelId = instagramChannel.id as string
 
     // Stap 4: idempotentie — als er al posts bestaan voor deze strategieversie, niet opnieuw aanmaken
     const { data: existingPosts, error: existingPostsError } = await supabaseAdmin

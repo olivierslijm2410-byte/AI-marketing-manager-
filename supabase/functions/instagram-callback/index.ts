@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Token-uitwisseling mislukt", details: tokenData }, 400)
     }
 
-    const { access_token: shortLivedToken, user_id: instagramUserId } = tokenData
+    const { access_token: shortLivedToken } = tokenData
 
     // Stap 2: omwisselen voor long-lived token (60 dagen)
     const longLivedRes = await fetch(
@@ -86,6 +86,25 @@ Deno.serve(async (req) => {
     if (!longLivedRes.ok || !longLivedData.access_token) {
       return jsonResponse({ error: "Omwisselen naar long-lived token mislukt", details: longLivedData }, 400)
     }
+
+    // Stap 2b: account-ID betrouwbaar ophalen via /me — NIET via tokenData.user_id.
+    // Meta geeft dat veld soms als kaal getal terug i.p.v. tekst, en Instagram-ID's
+    // hebben 17 cijfers — ruim voorbij wat JavaScript's number-type nauwkeurig kan
+    // opslaan, waardoor het laatste cijfer stilletjes kan afronden. De /me-endpoint
+    // geeft "id" wél netjes als string terug, dus geen precisieverlies.
+    const meRes = await fetch(
+      `https://graph.instagram.com/v25.0/me?${new URLSearchParams({
+        fields: "id",
+        access_token: longLivedData.access_token,
+      })}`
+    )
+    const meData = await meRes.json()
+
+    if (!meRes.ok || !meData.id) {
+      return jsonResponse({ error: "Kon Instagram-account-ID niet ophalen.", details: meData }, 400)
+    }
+
+    const instagramUserId = meData.id as string
 
     // Stap 3: zelf opslaan in channels (insert of update), token verlaat deze functie nooit
     const { data: existingChannel, error: lookupError } = await supabaseAdmin

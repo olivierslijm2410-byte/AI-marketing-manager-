@@ -57,6 +57,45 @@ async function safeJsonFromResponse(res: Response): Promise<any> {
   }
 }
 
+// Stap 10: één samenvattende melding per run (niet per post — dat zou te veel
+// ruis geven voor een bulk-taak). Zelfde envelope-aanpak als publish-post.
+async function sentryCapture(params: {
+  message: string
+  level: "info" | "warning" | "error"
+  extra?: Record<string, unknown>
+}): Promise<void> {
+  const dsn = Deno.env.get("SENTRY_DSN")
+  if (!dsn) return
+
+  try {
+    const dsnUrl = new URL(dsn)
+    const publicKey = dsnUrl.username
+    const projectId = dsnUrl.pathname.replace("/", "")
+    const ingestHost = dsnUrl.host
+    const eventId = crypto.randomUUID().replace(/-/g, "")
+
+    const envelopeHeader = JSON.stringify({ event_id: eventId, sent_at: new Date().toISOString(), dsn })
+    const itemHeader = JSON.stringify({ type: "event" })
+    const eventPayload = JSON.stringify({
+      event_id: eventId,
+      timestamp: new Date().toISOString(),
+      level: params.level,
+      message: params.message,
+      logger: "sync-post-insights",
+      platform: "other",
+      extra: params.extra,
+    })
+
+    await fetch(`https://${ingestHost}/api/${projectId}/envelope/?sentry_key=${publicKey}&sentry_version=7`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-sentry-envelope" },
+      body: `${envelopeHeader}\n${itemHeader}\n${eventPayload}\n`,
+    })
+  } catch {
+    // logging mag nooit de hoofdflow breken
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders })
@@ -139,6 +178,20 @@ Deno.serve(async (req) => {
         .eq("id", post.id)
 
       syncedCount += 1
+    }
+
+    if (failedCount > 0) {
+      await sentryCapture({
+        message: `sync-post-insights: ${failedCount} van ${duePosts.length} posts mislukt`,
+        level: "warning",
+        extra: { synced: syncedCount, failed: failedCount, total: duePosts.length },
+      })
+    } else {
+      await sentryCapture({
+        message: `sync-post-insights: run voltooid, ${syncedCount} posts gesynchroniseerd`,
+        level: "info",
+        extra: { synced: syncedCount, total: duePosts.length },
+      })
     }
 
     return jsonResponse({ synced: syncedCount, failed: failedCount, total: duePosts.length }, 200)

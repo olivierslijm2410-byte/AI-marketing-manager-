@@ -124,7 +124,59 @@ async function failAttempt(
     })
     .eq("id", postId)
 
+  await sentryCapture({
+    message: `publish-post: ${isFinal ? "definitief mislukt" : "poging mislukt, retry gepland"} (${errorCode})`,
+    level: isFinal ? "error" : "warning",
+    tags: { post_id: postId, error_code: errorCode },
+    extra: { retry_count: nextRetryCount, error_message: errorMessage },
+  })
+
   return { final: isFinal }
+}
+
+// Stap 10: elke publicatiepoging (geslaagd of niet) loggen naar Sentry, met
+// post-id, error_code (indien van toepassing) en retry_count. Gebruikt de
+// moderne envelope-API rechtstreeks (geen SDK-dependency nodig in Deno) — de
+// oudere store-API is door Sentry uitgefaseerd. Logging mag de hoofdflow
+// nooit breken, dus elke fout hierin wordt stil geslikt. Werkt pas zodra de
+// SENTRY_DSN-secret is ingesteld; zolang die ontbreekt, no-opt dit stil.
+async function sentryCapture(params: {
+  message: string
+  level: "info" | "warning" | "error"
+  tags?: Record<string, string>
+  extra?: Record<string, unknown>
+}): Promise<void> {
+  const dsn = Deno.env.get("SENTRY_DSN")
+  if (!dsn) return
+
+  try {
+    const dsnUrl = new URL(dsn)
+    const publicKey = dsnUrl.username
+    const projectId = dsnUrl.pathname.replace("/", "")
+    const ingestHost = dsnUrl.host
+    const eventId = crypto.randomUUID().replace(/-/g, "")
+
+    const envelopeHeader = JSON.stringify({ event_id: eventId, sent_at: new Date().toISOString(), dsn })
+    const itemHeader = JSON.stringify({ type: "event" })
+    const eventPayload = JSON.stringify({
+      event_id: eventId,
+      timestamp: new Date().toISOString(),
+      level: params.level,
+      message: params.message,
+      logger: "publish-post",
+      platform: "other",
+      tags: params.tags,
+      extra: params.extra,
+    })
+
+    await fetch(`https://${ingestHost}/api/${projectId}/envelope/?sentry_key=${publicKey}&sentry_version=7`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-sentry-envelope" },
+      body: `${envelopeHeader}\n${itemHeader}\n${eventPayload}\n`,
+    })
+  } catch {
+    // logging mag nooit de hoofdflow breken
+  }
 }
 
 Deno.serve(async (req) => {
@@ -269,6 +321,13 @@ Deno.serve(async (req) => {
         error_message: null,
       })
       .eq("id", post_id)
+
+    await sentryCapture({
+      message: "publish-post: succesvol gepubliceerd",
+      level: "info",
+      tags: { post_id, error_code: "none" },
+      extra: { retry_count: claimed.retry_count, instagram_media_id: publishData.id },
+    })
 
     return jsonResponse({ success: true, instagram_media_id: publishData.id }, 200)
   } catch (err) {

@@ -197,6 +197,28 @@ goedkeuring/planning) was al specifiek gebouwd rond een eigen statusmodel — ee
 externe publishinglaag paste daar niet goed bovenop. Zelf gebouwd op de
 Meta Graph API in plaats daarvan.
 
+**Hardening na ChatGPT-review (ná de eerste "Fase 4 afgerond"-melding):** twee
+echte gaten gevonden en gefixt vóórdat Fase 4 definitief dichtging:
+- **Stale-claim recovery:** als `publish-post` crasht ná het claimen maar vóór
+  een statusupdate, bleef `claimed_at` voor altijd staan — de post kwam nooit
+  meer in aanmerking bij de cron. Gefixt: de cron-query accepteert nu ook
+  posts met een `claimed_at` ouder dan 10 minuten (ruim boven de normale
+  verwerkingstijd) als "verweesd" en pakt ze opnieuw op.
+- **Kritiek idempotency-gat:** de laatste statusupdate (`status: 'geplaatst'`)
+  checkte geen foutmelding. Als die database-schrijfactie faalde ná een
+  geslaagde Meta-publicatie, dacht de functie dat alles gelukt was — en zou de
+  post (in combinatie met de stale-claim-fix) na 10 minuten opnieuw zijn
+  geprobeerd, met een **dubbele Instagram-post** tot gevolg. Gefixt met 3
+  schrijfpogingen met korte backoff, en als dat alsnog faalt: een minimale
+  terugval-update die de post definitief op `mislukt` met
+  `error_code: 'manual_review_required'` zet (nooit automatisch retryen) plus
+  een `error`-niveau Sentry-melding voor handmatige controle.
+- NULL-vs-0 bij insights en de clicks/saved-naamgeving zijn bij controle al
+  correct gebleken, geen wijziging nodig.
+- `schedule_suggestion_reason` (Haiku-tijdsuggestie): bewust laten staan,
+  beschouwd als eerste kandidaat om te vereenvoudigen zodra de Analytics Agent
+  (Fase 6) echte gepersonaliseerde tijden kan berekenen.
+
 ## Fase 5-6 (later — pas na Fase 4)
 ### 6. Analytics Agent 🔴 — resultaten verzamelen en interpreteren
 ### 7. Reporting Agent 🔴 — rapportage in gewone taal

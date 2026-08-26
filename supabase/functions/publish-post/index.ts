@@ -29,6 +29,10 @@ const RETRY_POLICY: Record<string, { retryable: boolean; max: number }> = {
   missing_caption: { retryable: false, max: 0 },
   no_channel: { retryable: false, max: 0 },
   unknown_error: { retryable: true, max: 1 },
+  // Gebruikt in de kritieke terugval: Meta heeft al gepubliceerd, de database-
+  // update mislukte. Nooit automatisch opnieuw proberen — dat zou een dubbele
+  // Instagram-post veroorzaken. Vereist handmatige controle.
+  manual_review_required: { retryable: false, max: 0 },
 }
 
 interface PublishPostRequest {
@@ -310,17 +314,64 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: errorCode, final: result.final, details: publishData }, 200)
     }
 
-    // Succes
-    await supabaseAdmin
-      .from("posts")
-      .update({
-        status: "geplaatst",
-        platform_post_id: publishData.id,
-        published_at: new Date().toISOString(),
-        error_code: null,
-        error_message: null,
+    // Succes bij Meta — vanaf hier is de post ECHT gepubliceerd op Instagram.
+    // Kritiek: als de onderstaande database-update faalt, mag deze post NOOIT
+    // opnieuw via de normale flow geprobeerd worden (dat zou een dubbele
+    // publicatie op Instagram veroorzaken). Daarom: eerst een paar keer retry
+    // op de schrijfactie zelf, en als dat blijft mislukken, een minimale
+    // terugval-update die de post in elk geval buiten bereik van de cron zet.
+    let updateSucceeded = false
+    let lastUpdateError: string | null = null
+
+    for (let attempt = 0; attempt < 3 && !updateSucceeded; attempt++) {
+      if (attempt > 0) await sleep(1000 * attempt)
+
+      const { error: updateError } = await supabaseAdmin
+        .from("posts")
+        .update({
+          status: "geplaatst",
+          platform_post_id: publishData.id,
+          published_at: new Date().toISOString(),
+          error_code: null,
+          error_message: null,
+        })
+        .eq("id", post_id)
+
+      if (!updateError) {
+        updateSucceeded = true
+      } else {
+        lastUpdateError = updateError.message
+      }
+    }
+
+    if (!updateSucceeded) {
+      // Terugval: minimale update die de post in elk geval definitief uit de
+      // cron-selectie haalt (status niet meer 'gepland', error_code niet
+      // retryable) — platform_post_id proberen we alsnog mee te geven zodat
+      // een mens het kan matchen met de echte Instagram-post.
+      await supabaseAdmin
+        .from("posts")
+        .update({
+          status: "mislukt",
+          platform_post_id: publishData.id,
+          error_code: "manual_review_required",
+          error_message: `Gepubliceerd op Instagram (media-id ${publishData.id}), maar database-update mislukte na 3 pogingen: ${lastUpdateError}. Handmatig controleren en corrigeren.`,
+          claimed_at: null,
+        })
+        .eq("id", post_id)
+
+      await sentryCapture({
+        message: "publish-post: KRITIEK — gepubliceerd op Instagram maar database-update mislukt",
+        level: "error",
+        tags: { post_id, error_code: "manual_review_required" },
+        extra: { instagram_media_id: publishData.id, last_update_error: lastUpdateError },
       })
-      .eq("id", post_id)
+
+      return jsonResponse(
+        { error: "manual_review_required", instagram_media_id: publishData.id, final: true },
+        200,
+      )
+    }
 
     await sentryCapture({
       message: "publish-post: succesvol gepubliceerd",

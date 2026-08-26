@@ -45,8 +45,11 @@ technische details per agent).
 Fase 4 (Social Media Agent — automatisch publiceren + basisresultaten) is nu
 volledig afgerond, alle 12 stappen uit het stappenplan doorlopen en end-to-end
 getest, inclusief expliciete faalscenario's (verlopen token, ontbrekende
-afbeelding, gelijktijdige cron-runs). Zie AGENTS.md voor de volledige technische
-details.
+afbeelding, gelijktijdige cron-runs). Ná de eerste "afgerond"-melding nog een
+hardening-ronde gedaan (ChatGPT-review): stale-claim recovery in de cron en een
+kritiek idempotency-gat gefixt (database-update-fout ná succesvolle
+Meta-publicatie kon tot een dubbele Instagram-post leiden). Zie AGENTS.md voor
+de volledige technische details.
 
 Volgende stap: Fase 5/6 (Analytics Agent, Reporting Agent, Ads Manager Agent —
 zie docs/technische-blauwdruk.md, docs/stappenplan.md voor de volledige, vaste

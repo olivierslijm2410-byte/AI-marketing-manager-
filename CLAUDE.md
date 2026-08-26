@@ -36,28 +36,48 @@ scope- of ontwerpvragen, niet voor dagelijks werk.
 Fase 1 is afgerond: authenticatie, dashboard-skelet, onboardingflow én Instagram OAuth
 (koppelen, token-opslag, callback) werken end-to-end.
 
-Fase 2-3 (MVP-keten) is nu volledig afgerond: Content Strategy Agent, Copywriting
+Fase 2-3 (MVP-keten) is volledig afgerond: Content Strategy Agent, Copywriting
 Agent en Image Generation Agent staan alle drie op 🟢 — backend én frontend zijn
 voor alle drie klaar, end-to-end getest zowel via directe API-calls als via de
 browser-UI (Strategie-pagina en Contentkalender-pagina) (zie AGENTS.md voor de
 technische details per agent).
 
-Volgende stap: Fase 4 — Social Media Agent (automatisch publiceren + basisresultaten)
-(zie docs/technische-blauwdruk.md, docs/stappenplan.md voor de volledige, vaste
+Fase 4 (Social Media Agent — automatisch publiceren + basisresultaten) is nu
+volledig afgerond, alle 12 stappen uit het stappenplan doorlopen en end-to-end
+getest, inclusief expliciete faalscenario's (verlopen token, ontbrekende
+afbeelding, gelijktijdige cron-runs). Zie AGENTS.md voor de volledige technische
+details.
+
+Volgende stap: Fase 5/6 (Analytics Agent, Reporting Agent, Ads Manager Agent —
+zie docs/technische-blauwdruk.md, docs/stappenplan.md voor de volledige, vaste
 inhoud van elke stap — status van elke stap staat alleen hier).
 
 ## Bekende afwijkingen van de blauwdrukken
 - `channels`-tabel gebruikt in code: `user_id`, `platform`, `instagram_account_id`,
-  `access_token`, `token_expires_at`, `connected_at`.
-  docs/database-schema.md is hierop al bijgewerkt naar de echte kolommen.
+  `access_token`, `token_expires_at`, `connected_at`. Geen `status`-kolom (bewuste
+  keuze, zie Fase 4-sectie in AGENTS.md, "optie 1"). docs/database-schema.md is
+  hierop al bijgewerkt naar de echte kolommen.
+- Instagram OAuth-flow (instagram-callback) bleek bij nader onderzoek al de
+  correcte, actuele "Business Login for Instagram"-flow te zijn — géén migratie
+  van een verouderde API nodig zoals aanvankelijk gedacht. Wel een kritieke bug
+  gevonden en gefixt: Meta geeft grote ID's (17+ cijfers, account-ID's én
+  media-ID's) soms als kaal getal terug i.p.v. als string, wat tot stille
+  precisieverlies leidt bij een gewone `res.json()`. Zie AGENTS.md, Fase 4-sectie,
+  voor de volledige toedracht en fix (`safeJsonFromResponse`-patroon).
+- `posts.channel_id` wees door een bug in `approve-strategy` naar het
+  website-kanaal i.p.v. het Instagram-kanaal (waar daadwerkelijk op gepubliceerd
+  wordt) — gefixt, zie AGENTS.md.
 
 ## Tools & integraties — gepland, nog niet geconnect
 Status: 🔴 Nog te doen | 🟢 Klaar
 
-- Sentry (connector, error monitoring) 🔴 — nu te connecten
+- Sentry (connector, error monitoring) 🟢 — geconnect, project supabase-edge-functions
+  aangemaakt, DSN als secret ingesteld, logging actief in publish-post en
+  sync-post-insights (zie AGENTS.md, Fase 4 stap 10)
 - frontend-design (Claude Code plugin) 🔴 — nu te installeren
 - webapp-testing (Anthropic example-skill) 🔴 — nu te installeren
-- postiz (Claude Code plugin) 🔴 — bij Stap 5 / Fase 4 (publiceren)
+- postiz (Claude Code plugin) 🔴 — bewust niet gebruikt voor Fase 4, zelf gebouwd
+  (zie AGENTS.md voor de afweging)
 - resend (Claude Code plugin) 🔴 — bij Fase 5/6
 - Figma (connector) 🔴 — bij Stap 10 (naam/merk/website)
 - theme-factory (Anthropic example-skill) 🔴 — bij Stap 10
@@ -65,4 +85,4 @@ Status: 🔴 Nog te doen | 🟢 Klaar
 - shopify-ai-toolkit (Claude Code plugin) 🔴 — bij Stap 12 / Fase 6 (Shopify)
 
 mcp-builder en skill-creator: los inzetten wanneer nodig, niet fase-gebonden.
-canvas-design: bewust overgeslagen (te artistiek/abstract voor on-brand social content). 
+canvas-design: bewust overgeslagen (te artistiek/abstract voor on-brand social content).

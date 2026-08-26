@@ -83,9 +83,121 @@ voorkomt vermenging van verantwoordelijkheden zodra Fase 4 begint.
 - Bekende onduidelijkheid: de eenheid van het image_cost/Flux-API cost-veld is nog niet
   geverifieerd tegen een concreet euro/dollar-bedrag in het BFL-dashboard.
 
-## Fase 4-6 (later — pas na werkende MVP)
+## Fase 4 (afgerond)
 
-### 5. Social Media Agent 🔴 — content daadwerkelijk plaatsen
+### 5. Social Media Agent 🟢 klaar & getest (end-to-end, inclusief expliciete faalscenario's)
+- Doel: goedgekeurde en geplande content daadwerkelijk publiceren op Instagram, met
+  betrouwbare foutafhandeling en basis-resultaten.
+- Input: posts met status 'gepland' en een verstreken scheduled_at.
+- Output: status 'geplaatst' met platform_post_id en published_at, of 'mislukt' met
+  een duidelijke error_code na uitputting van de retry-strategie.
+- Afhankelijk van: Copywriting Agent (caption/hashtags), Image Generation Agent
+  (image_url), Instagram OAuth-koppeling.
+
+**Statusmodel:**
+`concept → wacht_op_goedkeuring → goedgekeurd → gepland → geplaatst`, met
+zijpaden naar `afgewezen` (vanuit wacht_op_goedkeuring) en `mislukt` (vanuit
+gepland, na uitputting van retries). Overgang `goedgekeurd → gepland` is hybride:
+bij goedkeuring stelt het systeem automatisch een `scheduled_at`-voorstel in
+(cadans van 2 dagen t.o.v. de laatst geplande sibling-post binnen dezelfde
+strategieversie, plus een lichte AI-tijdsuggestie via Haiku o.b.v. algemene
+richtlijnen + doelgroep — expliciet gelabeld als indicatief, niet gepersonaliseerd,
+want die data bestaat pas na de eerste publicaties). Gebruiker kan het voorstel
+altijd aanpassen vóór bevestiging.
+
+**Belangrijke bug gevonden en gefixt tijdens het bouwen:** `approve-strategy` zette
+`posts.channel_id` op het website-kanaal (uit `company_analyses.channel_id`) i.p.v.
+het Instagram-kanaal waarop daadwerkelijk gepubliceerd wordt. Gefixt door channel_id
+te bepalen via een directe lookup op `channels` (`platform = 'instagram'`), niet meer
+via de bedrijfsanalyse.
+
+**Instagram OAuth — onderzocht, geen migratie nodig:** de bestaande
+`instagram-callback`-flow bleek bij nader onderzoek al de correcte, actuele
+"Business Login for Instagram"-flow te zijn (endpoints `api.instagram.com/oauth/
+access_token` en `graph.instagram.com/access_token` zijn niet exclusief de
+uitgefaseerde Basic Display API, zoals aanvankelijk gedacht — het verschil zit in
+het Meta App Dashboard-productconfiguratie en de aangevraagde scopes, niet de
+URL's). Wel toegevoegd: `instagram_business_manage_insights`-scope (nodig voor
+stap 8 hieronder).
+
+**Kritieke bug gevonden en gefixt: precisieverlies bij grote Meta-ID's.** Instagram-
+en accountgegevens gebruiken 17+ cijferige ID's, ruim voorbij wat JavaScript's
+`number`-type nauwkeurig kan opslaan. Meta geeft zulke ID's soms als kaal getal
+terug i.p.v. als string (inconsistent per endpoint), waardoor een gewone
+`res.json()` het laatste cijfer stilletjes afrondt. Trof zowel het opgeslagen
+Instagram-account-ID (`instagram-callback`, gefixt door het ID via een aparte
+`/me`-aanroep op te halen i.p.v. via `tokenData.user_id`) als het `platform_post_id`
+na publiceren (`publish-post`). Structurele fix: een `safeJsonFromResponse`-helper
+in zowel `publish-post` als `sync-post-insights` die elk verdacht groot kaal getal
+in de ruwe responstekst eerst naar string omzet vóór het parsen. Eén testpost van
+vóór deze fix heeft een blijvend onherstelbaar `platform_post_id` (nu op NULL
+gezet zodat insights-sync 'm overslaat) — de post zelf staat wel gewoon en correct
+op Instagram, alleen de gekoppelde insights-sync kon niet meer worden hersteld.
+
+**`publish-post` Edge Function** — de kern van de agent:
+- Claim-locking (`UPDATE ... WHERE status='gepland' AND claimed_at IS NULL`) tegen
+  dubbele publicatie bij overlappende cron-runs, plus een extra idempotentie-check
+  op een reeds aanwezige `platform_post_id`. Getest met twee vrijwel gelijktijdige
+  aanroepen op dezelfde post — precies één verwerkte 'm, de ander kreeg direct een
+  "niet beschikbaar om te claimen"-melding terug.
+- Publicatieflow: media-container aanmaken → status pollen tot FINISHED → publiceren
+  via de Instagram Graph API (`graph.instagram.com/v25.0`).
+- Foutclassificatie + retry-beleid: `rate_limited` (max 5, retryable), `temporary_error`
+  (max 3, retryable), `token_expired`/`missing_image`/`missing_caption`/`no_channel`
+  (niet retryable, direct definitief mislukt), `unknown_error` (max 1 extra poging).
+  Bij een niet-definitieve mislukking gaat de status terug naar 'gepland' en wordt de
+  claim vrijgegeven zodat een volgende cron-run het opnieuw probeert.
+- Brede tokenfout-afhandeling (bewuste keuze, "optie 1" i.p.v. een aparte
+  `channels.status`-kolom): elke auth-gerelateerde Meta-fout wordt als
+  `token_expired` geclassificeerd, niet alleen een letterlijk verlopen
+  `token_expires_at`.
+
+**Cron (`pg_cron` + `pg_net`):** `publish-due-posts`, elke 5 minuten, selecteert
+posts met `status='gepland' AND scheduled_at<=now() AND claimed_at IS NULL` en
+roept `publish-post` per post aan (anon key als Authorization-header — voldoende
+om langs de `verify_jwt`-check te komen, de daadwerkelijke database-writes lopen
+via de service-role key die de functie zelf uit haar eigen omgeving haalt).
+
+**Token expiry + reconnect-melding (UX/UI-blauwdruk 8.2):** Kanalen-pagina en
+Overzicht-pagina tonen beide een ⚠️-status + directe "opnieuw verbinden"-knop
+zodra de koppeling kapot is (`token_expires_at` verlopen, of een publicatie na
+het laatste (her)koppelmoment mislukt is met `error_code='token_expired'`). Rest
+van de Overzicht-pagina blijft bewust placeholder — hoort niet bij deze stap.
+
+**`sync-post-insights` Edge Function (stap 8):** losse, periodieke bulk-taak
+(geen cron per post zoals publish-post, verwerkt alle due posts in één run),
+elke 6 uur. Haalt `reach`, `likes` en `saved` op via
+`graph.instagram.com/{media-id}/insights`. Belangrijke correctie op de
+oorspronkelijke aanname: Instagram levert **geen** "clicks"-metric voor organieke
+posts (dat bestaat alleen bij advertenties) — de bestaande `clicks`-kolom bevat
+daarom bewust de `saved`-metric (dichtstbijzijnde beschikbare actie-metric).
+
+**Resultaten-pagina (stap 9):** basale tabel (bereik/likes/bewaard per
+geplaatste post, gesorteerd op publicatiedatum). Bewust géén periodevergelijkingen,
+grafieken of AI-interpretatie — dat hoort bij de volwaardige Analytics Agent
+(Fase 6). Nette leeg-staat conform UX/UI-blauwdruk 8.1.
+
+**Sentry-logging (stap 10):** project `supabase-edge-functions` in de
+`ai-marketing-manager`-Sentry-organisatie. Rechtstreekse envelope-API-aanroepen
+vanuit de Edge Functions (geen SDK-dependency in Deno) — de oudere store-API is
+door Sentry uitgefaseerd. `publish-post` logt elke poging (geslaagd/mislukt) met
+post-id, error_code en retry_count; `sync-post-insights` logt een samenvatting
+per run. DSN als `SENTRY_DSN`-secret ingesteld, end-to-end geverifieerd (event
+kwam daadwerkelijk aan in Sentry).
+
+**End-to-end tests (stap 11), allemaal met resultaat bevestigd:** geldige
+publicatie, verlopen token (direct mislukt, geen retry), ontbrekende afbeelding
+(direct mislukt), twee gelijktijdige aanroepen op dezelfde post (geen dubbele
+publicatie). Rate limit-/retry-logica geverifieerd via codeinspectie i.p.v. een
+live test (een echte Meta-rate-limit forceren is te risicovol voor het
+productieaccount).
+
+**Postiz bewust niet gebruikt:** de bestaande architectuur (channels, posts, RLS,
+goedkeuring/planning) was al specifiek gebouwd rond een eigen statusmodel — een
+externe publishinglaag paste daar niet goed bovenop. Zelf gebouwd op de
+Meta Graph API in plaats daarvan.
+
+## Fase 5-6 (later — pas na Fase 4)
 ### 6. Analytics Agent 🔴 — resultaten verzamelen en interpreteren
 ### 7. Reporting Agent 🔴 — rapportage in gewone taal
 ### 8. Ads Manager Agent 🔴 — advertenties opzetten (na Meta/Google-verificatie)
@@ -103,9 +215,10 @@ voorkomt vermenging van verantwoordelijkheden zodra Fase 4 begint.
 Zie technische blauwdruk hoofdstuk 10 en agent-blauwdrukken hoofdstuk 17 voor de volledige
 fasering en samenwerkingsketen tussen agents.
 
-Nu actief: Fase 3 (MVP-keten) volledig afgerond — Website Analysis, Content Strategy,
-Copywriting en Image Generation Agent zijn alle vier klaar en end-to-end getest.
-Volgende stap: Fase 4 (Social Media Agent — content daadwerkelijk plaatsen).
+Nu actief: Fase 4 (Social Media Agent) volledig afgerond — automatisch publiceren,
+retry/foutafhandeling, cron, token-expiry-melding, basis-insights, Resultaten-pagina
+en Sentry-logging staan alle end-to-end getest.
+Volgende stap: Fase 5/6 (Analytics Agent, Reporting Agent, Ads Manager Agent).
 
 ## Toekomstige ideeën (nog niet plannen, wel onthouden)
 - Shopify-koppeling: conversies/verkopen uitlezen (Fase 6, voedt Sales Sync Agent)
@@ -116,4 +229,4 @@ Volgende stap: Fase 4 (Social Media Agent — content daadwerkelijk plaatsen).
 - Algemene voorwaarden, privacybeleid, verwerkersovereenkomst (SaaS-specifiek)
 - Database-backups, monitoring, rate limiting/misbruik-preventie
 - Beleid: wat als AI een dure fout maakt in een klant-advertentie
-- BTW-aanpak voor SaaS-abonnement (anders dan margeregeling) 
+- BTW-aanpak voor SaaS-abonnement (anders dan margeregeling)

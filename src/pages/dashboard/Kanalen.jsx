@@ -15,6 +15,17 @@ function getInstagramAuthorizeUrl() {
 const CONNECT_ERROR_MESSAGE = 'Koppelen mislukt, probeer opnieuw.'
 const ANALYSIS_ERROR_MESSAGE = 'Website gekoppeld, analyse is mislukt.'
 
+// Een koppeling is "verbroken" als het token letterlijk verlopen is, óf als er
+// ná het laatste (her)koppelmoment een publicatie is mislukt met een
+// auth-gerelateerde fout (token_expired — brede classificatie, zie publish-post).
+// Dat laatste vangt ook gevallen op waarbij Meta de toegang introk vóórdat de
+// vervaldatum bereikt was.
+function isConnectionBroken({ tokenExpiresAt, connectedAt, latestAuthFailureAt }) {
+  if (tokenExpiresAt && new Date(tokenExpiresAt) < new Date()) return true
+  if (latestAuthFailureAt && connectedAt && new Date(latestAuthFailureAt) > new Date(connectedAt)) return true
+  return false
+}
+
 export default function Kanalen() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
@@ -39,17 +50,41 @@ export default function Kanalen() {
 
     async function loadInstagramChannel() {
       setLoading(true)
-      const { data } = await supabase
+      const { data: channel } = await supabase
         .from('channels')
-        .select('instagram_account_id')
+        .select('id, instagram_account_id, token_expires_at, connected_at')
         .eq('user_id', user.id)
         .eq('platform', 'instagram')
         .maybeSingle()
 
-      if (!cancelled) {
-        setInstagramChannel(data)
+      if (cancelled) return
+
+      if (!channel) {
+        setInstagramChannel(null)
         setLoading(false)
+        return
       }
+
+      const { data: latestAuthFailure } = await supabase
+        .from('posts')
+        .select('last_attempted_at')
+        .eq('channel_id', channel.id)
+        .eq('error_code', 'token_expired')
+        .order('last_attempted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (cancelled) return
+
+      setInstagramChannel({
+        ...channel,
+        broken: isConnectionBroken({
+          tokenExpiresAt: channel.token_expires_at,
+          connectedAt: channel.connected_at,
+          latestAuthFailureAt: latestAuthFailure?.last_attempted_at ?? null,
+        }),
+      })
+      setLoading(false)
     }
 
     loadInstagramChannel()
@@ -217,7 +252,16 @@ export default function Kanalen() {
         {loading ? (
           <p>Laden...</p>
         ) : instagramChannel ? (
-          <p>Gekoppeld (account-id: {instagramChannel.instagram_account_id})</p>
+          instagramChannel.broken ? (
+            <div>
+              <p>⚠️ Verbinding verbroken — je Instagram-koppeling werkt niet meer (token verlopen of ingetrokken).</p>
+              <button type="button" onClick={handleConnectInstagram}>
+                Opnieuw verbinden
+              </button>
+            </div>
+          ) : (
+            <p>✅ Verbonden (account-id: {instagramChannel.instagram_account_id})</p>
+          )
         ) : (
           <button type="button" onClick={handleConnectInstagram}>
             Koppel Instagram

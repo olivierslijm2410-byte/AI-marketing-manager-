@@ -10,6 +10,7 @@ import Overzicht from './pages/dashboard/Overzicht'
 import Kanalen from './pages/dashboard/Kanalen'
 import Strategie from './pages/dashboard/Strategie'
 import Contentkalender from './pages/dashboard/Contentkalender'
+import Advertenties from './pages/dashboard/Advertenties'
 import Resultaten from './pages/dashboard/Resultaten'
 import Instellingen from './pages/dashboard/Instellingen'
 
@@ -50,6 +51,7 @@ function App() {
         <Route path="kanalen" element={<Kanalen />} />
         <Route path="strategie" element={<Strategie />} />
         <Route path="contentkalender" element={<Contentkalender />} />
+        <Route path="advertenties" element={<Advertenties />} />
         <Route path="resultaten" element={<Resultaten />} />
         <Route path="instellingen" element={<Instellingen />} />
       </Route>

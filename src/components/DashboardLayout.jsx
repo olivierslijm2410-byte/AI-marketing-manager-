@@ -28,6 +28,9 @@ export default function DashboardLayout() {
             <NavLink to="/dashboard/contentkalender">Contentkalender</NavLink>
           </li>
           <li>
+            <NavLink to="/dashboard/advertenties">Advertenties</NavLink>
+          </li>
+          <li>
             <NavLink to="/dashboard/resultaten">Resultaten</NavLink>
           </li>
           <li>

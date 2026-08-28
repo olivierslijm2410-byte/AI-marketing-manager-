@@ -11,6 +11,9 @@ const REQUEST_APPROVAL_ERROR_MESSAGE = 'Aanvragen van goedkeuring mislukt, probe
 const VIEW_APPROVAL_ERROR_MESSAGE = 'Kon de goedkeuringsaanvraag niet ophalen.'
 const CONFIRM_ERROR_MESSAGE = 'Bevestigen mislukt, probeer opnieuw.'
 const PAUSE_ERROR_MESSAGE = 'Pauzeren mislukt, probeer opnieuw.'
+const CREATE_META_ERROR_MESSAGE = 'Aanmaken op Meta mislukt, probeer opnieuw.'
+const META_SUCCESS_MESSAGE =
+  "Campagne is aangemaakt op Meta en staat daar gepauzeerd — er wordt geen geld uitgegeven totdat je 'm zelf in Meta Ads Manager op actief zet."
 const NOT_AVAILABLE = '—'
 
 const cardStyle = {
@@ -281,11 +284,14 @@ function ApprovalConfirmModal({ approvalInfo, onClose, onDecided, onRequestAppro
   )
 }
 
-function AdCampaignCard({ campaign, onRequestApproval, onOpenModal }) {
+function AdCampaignCard({ campaign, onRequestApproval, onOpenModal, onCreateOnMeta }) {
   const [requestStatus, setRequestStatus] = useState('idle')
   const [requestError, setRequestError] = useState('')
   const [viewStatus, setViewStatus] = useState('idle')
   const [viewError, setViewError] = useState('')
+  const [createStatus, setCreateStatus] = useState('idle')
+  const [createError, setCreateError] = useState('')
+  const [createSucceeded, setCreateSucceeded] = useState(false)
 
   async function handleRequestApprovalClick() {
     setRequestStatus('requesting')
@@ -328,6 +334,19 @@ function AdCampaignCard({ campaign, onRequestApproval, onOpenModal }) {
     })
   }
 
+  async function handleCreateOnMetaClick() {
+    setCreateStatus('creating')
+    setCreateError('')
+    const result = await onCreateOnMeta(campaign)
+    if (!result.ok) {
+      setCreateStatus('error')
+      setCreateError(result.error)
+      return
+    }
+    setCreateStatus('idle')
+    setCreateSucceeded(true)
+  }
+
   return (
     <div style={cardStyle}>
       <p style={{ fontWeight: 600, margin: 0 }}>
@@ -361,6 +380,25 @@ function AdCampaignCard({ campaign, onRequestApproval, onOpenModal }) {
           </button>
           {viewStatus === 'error' && <p>{viewError}</p>}
         </div>
+      )}
+
+      {campaign.status === 'goedgekeurd' && (
+        <div style={{ marginTop: '12px' }}>
+          <button type="button" onClick={handleCreateOnMetaClick} disabled={createStatus === 'creating'}>
+            {createStatus === 'creating' ? 'Bezig...' : 'Aanmaken op Meta'}
+          </button>
+          {createStatus === 'error' && <p>{createError}</p>}
+        </div>
+      )}
+
+      {createSucceeded && campaign.status === 'gepauzeerd' && <p style={{ marginTop: '12px' }}>{META_SUCCESS_MESSAGE}</p>}
+
+      {campaign.status === 'mislukt' && campaign.meta_error && <p style={{ marginTop: '12px' }}>{campaign.meta_error}</p>}
+
+      {campaign.meta_campaign_id && (
+        <p style={{ marginTop: '8px', fontSize: '0.75em', color: 'var(--text)' }}>
+          Meta campagne-ID: {campaign.meta_campaign_id}
+        </p>
       )}
     </div>
   )
@@ -453,6 +491,22 @@ export default function Advertenties() {
   function handleApprovalDecided({ campaignId, status }) {
     setCampaigns((prev) => prev.map((c) => (c.id === campaignId ? { ...c, status } : c)))
     setModalInfo(null)
+  }
+
+  async function createOnMeta(campaign) {
+    const { ok, data } = await callAdsFunction('create-meta-campaign', { campaign_id: campaign.id })
+
+    const { data: refreshedCampaign } = await supabase.from('ads_campaigns').select('*').eq('id', campaign.id).single()
+
+    if (refreshedCampaign) {
+      setCampaigns((prev) => prev.map((c) => (c.id === campaign.id ? refreshedCampaign : c)))
+    }
+
+    if (!ok) {
+      return { ok: false, error: data.error || CREATE_META_ERROR_MESSAGE }
+    }
+
+    return { ok: true }
   }
 
   async function handleGenerateProposal(event) {
@@ -666,6 +720,7 @@ export default function Advertenties() {
             campaign={campaign}
             onRequestApproval={requestApproval}
             onOpenModal={setModalInfo}
+            onCreateOnMeta={createOnMeta}
           />
         ))}
       </div>
